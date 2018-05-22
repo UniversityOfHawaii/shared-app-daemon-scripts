@@ -1,0 +1,47 @@
+#! /bin/sh
+# clean-app - Clean up app's files.
+#           - 06/13/05, Russell Tokuyama (UH ITS)
+#
+# $Id: clean-app-common 4301 2010-08-05 21:23:59Z jbeutel $
+# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/clean-app-common $
+#
+# Mod: 03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
+#---------------------------------------------------------------------
+# Install:
+#   1. Install as clean-app-common in /usr/local/bin.
+#   2. Symlink from /usr/local/bin/clean-app-common to clean-app in APP_USER's home dir.
+#   3. For convenience, add APP_USER's home dir to PATH env var.
+
+
+# You shouldn't need to change variable settings in this script;
+# you can override all variables like FOO=${FOO:-default} in the app.parameters file.
+
+# include parameters from same dir as this script
+PARAM_FILE=`dirname $0`/app.parameters
+if [ ! -f $PARAM_FILE ] ; then
+  echo "$PARAM_FILE not found" 1>&2
+  exit 1
+fi
+. $PARAM_FILE
+
+# make sure we got the required parameter
+APP_USER=${APP_USER:?}
+
+# default
+if [ `uname` = "SunOS" ]; then
+  APP_HOME=${APP_HOME:-/var/home/${APP_USER}}
+else
+  APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
+fi
+
+# defaults
+CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
+LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
+
+echo "Cleaning out old log file directories..."
+#  older than this many days
+LOG_DAYS=${LOG_DAYS:-14}
+
+find $LOG_DIR -type d -mtime +${LOG_DAYS} | xargs /bin/rm -rf 
+
+# eof: clean-app

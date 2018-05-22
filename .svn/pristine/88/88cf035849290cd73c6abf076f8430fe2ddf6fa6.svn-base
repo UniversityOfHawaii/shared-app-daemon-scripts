@@ -1,0 +1,22 @@
+# In 1.6.0_14, the following role can invoke methods, but not create anything.
+# That provides the security I want, while still supporting VisualVM.
+# So, SITAR is using write too, to resetCoutners() to get max stats.
+
+nonCreateRole readwrite
+
+# If a role were allowed to create javax.management.loading.MLet,
+# it could upload and run arbitrary code in the app!  That would be
+# a bad security hole for production, even though our
+# firewall is limiting connections to our private network.
+# 1.6.0_07 does not support the create clause and allows any create
+# for readwrite, but 1.6.0_14 limits creates.
+#
+# controlRole readwrite \
+#             create javax.management.timer.*,javax.management.monitor.* \
+#             unregister
+#
+# VisualVM 1.1.1 (1.6.0_14) doesn't work with readonly,
+# and we're accepting the passwords in the clear (i.e., without SSL),
+# so there's not much reason to configure a readonly role.
+#
+# monitorRole readonly

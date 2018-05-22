@@ -1,0 +1,90 @@
+#! /bin/sh
+# deploy - Removes the old directory that the app's WAR file was expanded in
+#          to make sure that the new WAR file is deployed.
+#          See 0-README.txt.
+#        - 01/13/04, Russell Tokuyama
+#
+# $Id: deploy-common 4301 2010-08-05 21:23:59Z jbeutel $
+# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/deploy-common $
+#
+# Mod: 04/18/06, russ@hawaii.edu; Added removal of old context config and work
+#                files.
+#      07/29/08, russ@hawaii.edu; Replaced whoami with id.
+#      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
+#
+# Preconditions:
+#   1. The distribution should be named like ${CTX_NAME}.war (see the
+#      code below) and already in the ${WEBAPPS_DIR}.
+#
+#   2. The user running this script must be in the same group as the
+#      ${APP_USER}.
+#
+#
+# USAGE: (as the application user)
+#
+#   $ deploy
+#
+#---------------------------------------------------------------------
+# Install:
+#   1. Install as deploy-common in /usr/local/bin.
+#   2. Symlink from /usr/local/bin/deploy-common to deploy in APP_USER's home dir.
+#   3. For convenience, add APP_USER's home dir to PATH env var.
+
+# You shouldn't need to change variable settings in this script;
+# you can override all variables like FOO=${FOO:-default} in the app.parameters file.
+
+# include parameters from same dir as this script
+PARAM_FILE=`dirname $0`/app.parameters
+if [ ! -f $PARAM_FILE ] ; then
+  echo "$PARAM_FILE not found" 1>&2
+  exit 1
+fi
+. $PARAM_FILE
+
+# make sure we got the required parameters
+APP_USER=${APP_USER:?}
+APP_GRP=${APP_GRP:?}
+CTX_NAME=${CTX_NAME:?}
+
+# Binary distribution must be named like so:
+DIST=${DIST:-${CTX_NAME}.war}
+
+# default
+if [ `uname` = "SunOS" ]; then
+  APP_HOME=${APP_HOME:-/var/home/${APP_USER}}
+else
+  APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
+fi
+
+# defaults
+CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
+WEBAPPS_DIR=${WEBAPPS_DIR:-${CATALINA_BASE}/webapps}
+WEBCONF_DIR=${WEBCONF_DIR:-${CATALINA_BASE}/conf/Catalina}
+WORK_DIR=${WORK_DIR:-${CATALINA_BASE}/work}
+
+CURR_USER=`id | sed 's/[^(]*(\([^)]*\)).*$/\1/'`
+
+if [ ${CURR_USER} != ${APP_USER} ] ; then
+  echo "You must change to the ${APP_USER} to run this command."
+  exit 1
+fi
+
+if [ ! -f ${WEBAPPS_DIR}/${DIST} ] ; then
+  echo "${DIST} not found.  Please upload it and run prep as your regular user."
+  exit 1
+fi
+
+# remove expanded app directory
+echo "Removing expanded app directory, ${CTX_NAME}, from ${WEBAPPS_DIR}..."
+/bin/rm -rf  ${WEBAPPS_DIR}/${CTX_NAME}
+echo "Removing context config file, ${CTX_NAME}.xml, from under ${WEBCONF_DIR}..."
+/bin/rm -f  ${WEBCONF_DIR}/*/${CTX_NAME}.xml
+echo "Removing old work files from ${WORK_DIR}..."
+/bin/rm -rf  ${WORK_DIR}/*
+
+echo
+echo "Application deployed."
+echo
+echo "Start the application, using \"app start\""
+
+# eof: deploy

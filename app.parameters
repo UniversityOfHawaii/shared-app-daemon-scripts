@@ -1,0 +1,64 @@
+# app.parameters - include from app, clean-app, prep, and deploy scripts.
+# Try to avoid modifying those scripts, to make them easier to maintain.
+#
+# $Id: app.parameters 5655 2016-05-06 02:01:07Z cahana $
+# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/app.parameters $
+#
+ 
+# required, daemon's user name, e.g., APP_USER=casl2d
+APP_USER={{ user }}
+
+# required by prep and deploy scripts, daemon's group name, e.g., APP_GRP=cas
+APP_GRP={{ group }}
+
+# required by prep and deploy scripts, web app's context name, e.g., CTX_NAME=casl2
+CTX_NAME={{ context_name }}
+
+# optional, but recommended for monitoring and maintenance
+#JMX_PORT={{ jmx_port }}
+#JMX_RMI_PORT={{ jmx_rmi_port }}
+
+# required if JMX clients fail to connect because the callback doesn't default to the pvt address
+#JMX_HOST={{ server }}.pvt.hawaii.edu
+
+# recommended, to wait for close when stopping, e.g., WAIT_PORTS="9301 9663"
+# (match this app's tomcat/conf/server.xml HTTP and HTTPS ports)
+#WAIT_PORTS="{{ http_port }} {{ https_port }} $JMX_PORT $JMX_RMI_PORT"
+
+####################### override examples (with default values)
+
+# override memory limits (added to CATALINA_OPTS)
+#JVM_HEAP="-Xms64m -Xmx128m"
+
+# override avoidance of broken SSL (added to CATALINA_OPTS)
+#JVM_SECURITY="-Djsse.enableSNIExtension=false -Dhttps.protocols=TLSv1"
+
+# override verbose garbage collection logging (added to CATALINA_OPTS)
+#VERBOSE_GC="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError"
+# to turn off that logging, override with a space
+#VERBOSE_GC=" "
+
+# base CATALINA_OPTS, example of remote debugging (change xxxx to an available port)
+# ref: http://download.oracle.com/javase/6/docs/technotes/guides/jpda/conninv.html
+#CATALINA_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=xxxx"
+
+# override of wait period for graceful Tomcat shutdown
+#STOP_SECONDS=30
+
+# override of JAVA_HOME, with a different name to avoid unintentional overrides
+#OVERRIDE_JAVA_HOME=/usr/java/latest
+
+# overrides for YourKit CPU/memory profiling
+#YK_PORT=`expr ${JMX_PORT:?} - 1000`	# by ITS convention
+#YK_HOME=/usr/local/spkg/yjp-8.0.18
+
+# override where Tomcat is
+#APP_HOME=/var/home/${APP_USER} # or /home/${APP_USER} on Linux
+#CATALINA_BASE=${APP_HOME:?}/tomcat
+#CATALINA_HOME=/usr/local/pkg/tomcat
+
+# override for file version, altho the file itself is optional
+#SOCKET_MBEAN_AGENT=${APP_HOME:?}/common-1.17-socketStatisticsAgent.jar
+
+# override the number of days to age off log directories; default is 30 days
+#OLD_AGE=120
