@@ -2,8 +2,7 @@
 # app - Run Tomcat servlet container.
 #     - 10/02/08, Russell Tokuyama (UH ITS)
 #
-# $Id: app-common 6096 2018-05-22 02:24:50Z cahana $
-# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/app-common $
+# $Id$
 #
 # Mod: 11/25/08, russ@hawaii.edu; Silenced error output of kill.
 #      12/10/08, jbeutel@hawaii.edu; added JMX and wait for stop before kill

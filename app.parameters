@@ -1,8 +1,7 @@
 # app.parameters - include from app, clean-app, prep, and deploy scripts.
 # Try to avoid modifying those scripts, to make them easier to maintain.
 #
-# $Id: app.parameters 5655 2016-05-06 02:01:07Z cahana $
-# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/app.parameters $
+# $Id$
 #
  
 # required, daemon's user name, e.g., APP_USER=casl2d
