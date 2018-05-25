@@ -1,5 +1,3 @@
-@Library('jenkins-tools') _
-
 pipeline {
   agent any
   options {
