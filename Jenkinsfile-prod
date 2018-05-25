@@ -6,13 +6,14 @@ pipeline {
   stages {
       stage('SCP app-common') {
           steps {
-              sh 'scp app-common cisd@its93.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@its94.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@its95.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@its96.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@its97.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@its98.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@its99.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its03.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its12.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its13.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its21.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its22.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its23.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@its25.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@sec02.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'              
           }
       }
   }
