@@ -1,0 +1,22 @@
+@Library('jenkins-tools') _
+
+pipeline {
+  agent any
+  options {
+    buildDiscarder(logRotator(numToKeepStr:'10'))
+  }
+  stages {
+      stage('SCP app-common') {
+          steps {
+              sh 'scp app-common cisd@its98.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+          }
+      }
+  }
+  post {
+    failure {
+        mail to: 'sfblake@hawaii.edu',
+             subject: "Failed ${currentBuild.fullDisplayName}",
+             body: "${env.RUN_DISPLAY_URL}"
+    }
+  }
+}
