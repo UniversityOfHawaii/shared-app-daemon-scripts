@@ -6,8 +6,7 @@
 #        See 0-README.txt.
 #      - 09/23/08, Russell Tokuyama
 #
-# $Id: prep-common 5461 2015-12-02 22:02:42Z cahana $
-# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/prep-common $
+# $Id$
 #
 # Mod: 
 #      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides

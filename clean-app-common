@@ -2,8 +2,7 @@
 # clean-app - Clean up app's files.
 #           - 06/13/05, Russell Tokuyama (UH ITS)
 #
-# $Id: clean-app-common 4301 2010-08-05 21:23:59Z jbeutel $
-# $URL: svn+ssh://svnd@repo.its.hawaii.edu/misint/appDaemon/branches/trunk/clean-app-common $
+# $Id$
 #
 # Mod: 03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
 #---------------------------------------------------------------------
