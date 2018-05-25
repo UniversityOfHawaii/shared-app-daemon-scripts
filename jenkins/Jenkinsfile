@@ -14,7 +14,7 @@ pipeline {
   }
   post {
     failure {
-        mail to: 'sfblake@hawaii.edu',
+        mail to: 'cahana@hawaii.edu',
              subject: "Failed ${currentBuild.fullDisplayName}",
              body: "${env.RUN_DISPLAY_URL}"
     }
