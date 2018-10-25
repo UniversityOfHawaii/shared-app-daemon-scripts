@@ -13,6 +13,10 @@ pipeline {
               sh 'scp app-common cisd@its97.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp app-common cisd@its98.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp app-common cisd@its99.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@iwa71.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@iws71.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'            
+              sh 'scp app-common cisd@iwa41.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common cisd@iws41.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
           }
       }
   }
