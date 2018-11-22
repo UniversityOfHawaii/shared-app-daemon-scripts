@@ -20,6 +20,7 @@
 #      12/04/16, jbeutel@hawaii.edu; added JMX_RMI_PORT & updated defaults
 #	   04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
 #      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5	
+#      11/21/18, jbeutel@hawaii.edu; added netstat_port() support for MacOS
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -165,7 +166,11 @@ netstat_port() {
   if [ `uname` = "SunOS" ]; then
     netstat -a | nawk -v hnp="[.]$1$" '$1 ~ hnp'
   else
-    netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
+    if [ `uname` = "Darwin" ]; then     # MacOS
+      netstat -v -a -n -t | awk -v hnp=":$1$" '$4 ~ hnp'
+    else
+      netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
+    fi
   fi
 }
 
