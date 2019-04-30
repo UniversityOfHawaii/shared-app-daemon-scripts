@@ -18,8 +18,9 @@
 #      07/12/13, jbeutel@hawaii.edu; updated default jdk to Solaris 1.6.0_51
 #      12/02/15, cahana@hawaii.edu; merged with app script from the current RHEL servers
 #      12/04/16, jbeutel@hawaii.edu; added JMX_RMI_PORT & updated defaults
-#	   04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
-#      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5	
+#      04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
+#      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
+#      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -52,7 +53,7 @@ APP_USER=${APP_USER:?}
 STOP_SECONDS=${STOP_SECONDS:-30}
 
 # default for YourKit CPU/memory profiling
-#YK_PORT=${YK_PORT:-`expr $JMX_PORT - 1000`}	# by ITS convention
+#YK_PORT=${YK_PORT:-`expr $JMX_PORT - 1000`} # by ITS convention
 #YK_HOME=${YK_HOME:-/usr/local/spkg/yjp-8.0.18}
 
 # default
@@ -221,7 +222,7 @@ age_logs() {
     find $LOG_DIR -maxdepth 1 -type d -mtime +${OLD_AGE} -print -exec rm -rf {} \;
 }
 
-start() { 
+start() {
 	if [ "$1" = "yourkit" -a ! -z "$YK_PORT" ]; then
 		HOSTNAME=`hostname`
 		JAVA_OPTS="-agentpath:\
@@ -234,16 +235,16 @@ sessionname=$HOSTNAME-$APP_USER,port=$YK_PORT $JAVA_OPTS"
 
     echo "Starting Tomcat at `date`" | tee -a $APP_LOG
     ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml >> $APP_LOG 2>&1
-         
+
     sleep 3
-     
+
     if [ ! -f $CATALINA_PID ]; then
-        echo "Tomcat not started"
+        echo "Tomcat not started (pid file not found)"
         return 1
     fi
-     
+
     TC_PID=`cat_pid`
-     
+
     if ps_tomcat $TC_PID; then
         echo "Tomcat started"
         return 0
@@ -252,19 +253,19 @@ sessionname=$HOSTNAME-$APP_USER,port=$YK_PORT $JAVA_OPTS"
         return 1
     fi
 }
-    
-     
-stop() { 
+
+
+stop() {
     echo "Stopping Tomcat servlet container at `date`" | tee -a $APP_LOG
     ${CATALINA_HOME}/bin/shutdown.sh >> $APP_LOG 2>&1
     sleep 5
-     
+
     PID=`cat_pid`
 
     if [ -z "$PID" ]; then
         PID=`ps_tomcat $APP_USER | awk '{print $2}'`
-    fi 
-     
+    fi
+
     if [ ! -z "$PID" ]; then
       if [ $STOP_SECONDS -gt 0 ]; then
         echo_n "Waiting up to $STOP_SECONDS seconds for Tomcat to stop..."
@@ -286,19 +287,19 @@ stop() {
       fi
     fi
     wait_for_ports_to_close $WAIT_PORTS
-     
+
     rotate
     age_logs
     check
 }
 
- 
+
 check() {
     KEY=`cat_pid`
     if [ -z "$KEY" ]; then
         # no pid file
-        KEY=$APP_USER 
-    fi 
+        KEY=$APP_USER
+    fi
 
     if ps_tomcat $KEY; then
       return 0
@@ -328,5 +329,5 @@ case "$1" in
     ;;
 esac
 
- 
+
 # eof: app
