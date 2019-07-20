@@ -21,6 +21,7 @@
 #      04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
 #      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
 #      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
+#      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -165,6 +166,8 @@ echo_n() {
 netstat_port() {
   if [ `uname` = "SunOS" ]; then
     netstat -a | nawk -v hnp="[.]$1$" '$1 ~ hnp'
+  elif [ `uname` = "Darwin" ]; then     # macOS
+    netstat -v -a -n | awk -v hnp="[.]$1$" '$4 ~ hnp'
   else
     netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
   fi
