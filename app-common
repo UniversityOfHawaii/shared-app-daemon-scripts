@@ -21,6 +21,7 @@
 #      04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
 #      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
 #      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
+#      10/07/20, jkeen@endosys.com; Clean up SunOS conditionals and add log archive since log4j does logrotate.
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -57,11 +58,7 @@ STOP_SECONDS=${STOP_SECONDS:-30}
 #YK_HOME=${YK_HOME:-/usr/local/spkg/yjp-8.0.18}
 
 # default
-if [ `uname` = "SunOS" ]; then
-  APP_HOME=${APP_HOME:-/var/home/${APP_USER}}
-else
-  APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
-fi
+APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
 
 # default where Java and Tomcat are
 JAVA_HOME=${OVERRIDE_JAVA_HOME:-/usr/java/latest}
@@ -88,9 +85,16 @@ fi
 
 CURR_USER=`id | sed 's/[^(]*(\([^)]*\)).*$/\1/'`
 
-if [ ${CURR_USER} != ${APP_USER} ] ; then
-  echo "You must change to the ${APP_USER} to run this command."
-  exit 1
+if [[ $1 == "log-new" ]]; then
+  if [ ${CURR_USER} != "root" ] ; then
+    echo "You must be root to run this command with the log-new parameter."
+    exit 1
+  fi
+else
+  if [ ${CURR_USER} != ${APP_USER} ] ; then
+    echo "You must change to the ${APP_USER} to run this command."
+    exit 1
+  fi
 fi
 
 #---------- other environment variables -------------
@@ -154,20 +158,8 @@ ps_tomcat() {
     ps -ef | grep $1 | grep java | grep util.logging
 }
 
-echo_n() {
-  if [ `uname` = "SunOS" ]; then
-    /usr/ucb/echo -n $*
-  else
-    echo -n $*
-  fi
-}
-
 netstat_port() {
-  if [ `uname` = "SunOS" ]; then
-    netstat -a | nawk -v hnp="[.]$1$" '$1 ~ hnp'
-  else
     netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
-  fi
 }
 
 # parameters: 0 or more port numbers to wait on
@@ -268,10 +260,10 @@ stop() {
 
     if [ ! -z "$PID" ]; then
       if [ $STOP_SECONDS -gt 0 ]; then
-        echo_n "Waiting up to $STOP_SECONDS seconds for Tomcat to stop..."
+        echo -n "Waiting up to $STOP_SECONDS seconds for Tomcat to stop..."
         WAITED=0
         while ps_tomcat $PID > /dev/null && [ $WAITED -lt $STOP_SECONDS ]; do
-	  echo_n "."
+	        echo -n "."
           sleep 3
           WAITED=`expr $WAITED + 3`
         done
@@ -310,6 +302,35 @@ check() {
     fi
 }
 
+log_archive() {
+  # log4j handles rotation of logs this will archive those logs for default
+  # of 30 days or OLD_AGE value. This will create a cron to daily tar and zip 
+  # all .txt, .log and .out files in LOG_DIR.
+
+  # create file name for cron.daily from LOG_DIR path
+  ROTATE_FILE_NAME=$(echo ${LOG_DIR//\//-} | cut -c2-)-archive
+  
+  # if cron doesn't exist create 
+  if [ ! -e  /etc/cron.daily/$ROTATE_FILE_NAME ]; then
+    cat >/etc/cron.daily/$ROTATE_FILE_NAME <<EOL
+ARCHIVE_FILE=\$(date '+%y%m%d-%H%M')
+# switch to log directory
+cd $LOG_DIR
+# create archive file
+mkdir -p tmp
+mv *.{txt,log,out} tmp/.
+tar -C tmp -zcvf \$ARCHIVE_FILE.tgz  .
+rm -rf tmp
+
+# remove archives older than OLD_AGE
+find . -maxdepth 1 -type f -name "*.tgz" -mtime +${OLD_AGE} -exec rm -rf {} \;
+EOL
+    chmod 0755 /etc/cron.daily/$ROTATE_FILE_NAME
+  fi
+  # just update archive duration
+  sed -i "s/+[0-9]\+/+$OLD_AGE/" /etc/cron.daily/$ROTATE_FILE_NAME
+}
+
 
 case "$1" in
 'start')
@@ -321,11 +342,19 @@ case "$1" in
 'check')
     check
     ;;
+'log-old')
+    rotate
+    age_logs
+    check
+    ;;
+'log-new')
+    log_archive
+    ;;
 'yourkit')
 	start yourkit
 	;;
 *)
-    echo "Usage: $0 { start | stop | check | yourkit }"
+    echo "Usage: $0 { start | stop | check | log-old | log-new | yourkit }"
     ;;
 esac
 
