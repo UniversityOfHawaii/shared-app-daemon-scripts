@@ -23,6 +23,7 @@
 #      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
 #      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
 #      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
+#      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -124,7 +125,8 @@ CO="$CO $VERBOSE_GC"
 # additional options for JMX (for management via VisualVM or Zabbix)
 if [ ! -z "$JMX_PORT" ]; then
   CO="$CO -Dcom.sun.management.jmxremote.port=$JMX_PORT"
-  JMX_RMI_PORT=${JMX_RMI_PORT:-`expr $JMX_PORT + 100`}  # by ITS convention
+  JMX_RMI_PORT=${JMX_RMI_PORT:-`expr $JMX_PORT + 100`}  # default to ITS convention, if not given
+  WAIT_PORTS="${WAIT_PORTS} $JMX_RMI_PORT"  # add defaulted port (even though it's redundant if not defaulted)
   CO="$CO -Dcom.sun.management.jmxremote.rmi.port=$JMX_RMI_PORT"
   CO="$CO -Dcom.sun.management.jmxremote.ssl=false"
   CO="$CO -Dcom.sun.management.jmxremote.authenticate=true"
