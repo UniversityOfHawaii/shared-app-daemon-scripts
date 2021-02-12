@@ -22,6 +22,7 @@
 #      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
 #      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
 #      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
+#      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -211,7 +212,7 @@ rotate() {
     echo "$CNT files moved to $LOG_DIR/$BKUP_DIR"
 
     echo "Compressing files in $LOG_DIR/$BKUP_DIR"
-    /bin/gzip -v $LOG_DIR/$BKUP_DIR/*
+    gzip -v $LOG_DIR/$BKUP_DIR/*
     return 0
 }
 
