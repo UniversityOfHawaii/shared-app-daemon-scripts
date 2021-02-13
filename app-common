@@ -21,6 +21,9 @@
 #      04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
 #      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
 #      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
+#      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
+#      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
+#      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user.
@@ -122,7 +125,8 @@ CO="$CO $VERBOSE_GC"
 # additional options for JMX (for management via VisualVM or Zabbix)
 if [ ! -z "$JMX_PORT" ]; then
   CO="$CO -Dcom.sun.management.jmxremote.port=$JMX_PORT"
-  JMX_RMI_PORT=${JMX_RMI_PORT:-`expr $JMX_PORT + 100`}  # by ITS convention
+  JMX_RMI_PORT=${JMX_RMI_PORT:-`expr $JMX_PORT + 100`}  # default to ITS convention, if not given
+  WAIT_PORTS="${WAIT_PORTS} $JMX_RMI_PORT"  # add defaulted port (even though it's redundant if not defaulted)
   CO="$CO -Dcom.sun.management.jmxremote.rmi.port=$JMX_RMI_PORT"
   CO="$CO -Dcom.sun.management.jmxremote.ssl=false"
   CO="$CO -Dcom.sun.management.jmxremote.authenticate=true"
@@ -165,6 +169,8 @@ echo_n() {
 netstat_port() {
   if [ `uname` = "SunOS" ]; then
     netstat -a | nawk -v hnp="[.]$1$" '$1 ~ hnp'
+  elif [ `uname` = "Darwin" ]; then     # macOS
+    netstat -v -a -n | awk -v hnp="[.]$1$" '$4 ~ hnp'
   else
     netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
   fi
@@ -208,7 +214,7 @@ rotate() {
     echo "$CNT files moved to $LOG_DIR/$BKUP_DIR"
 
     echo "Compressing files in $LOG_DIR/$BKUP_DIR"
-    /bin/gzip -v $LOG_DIR/$BKUP_DIR/*
+    gzip -v $LOG_DIR/$BKUP_DIR/*
     return 0
 }
 
