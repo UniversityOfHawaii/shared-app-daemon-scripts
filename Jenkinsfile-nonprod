@@ -12,14 +12,10 @@ pipeline {
               sh 'scp app-common cisd@its96.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp app-common cisd@its97.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp app-common cisd@its99.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iwa71.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iws71.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'            
-              sh 'scp app-common cisd@iwa41.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iws41.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iwa73.its.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iws73.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iwa43.its.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iws43.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common myiamd@iwa73.its.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common myiamd@iws73.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common myiamd@iwa43.its.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common myiamd@iws43.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
           }
       }
   }
