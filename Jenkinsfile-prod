@@ -16,8 +16,7 @@ pipeline {
               sh 'scp app-common cisd@sec02.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp app-common cisd@iwa01.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp app-common myiamd@iws03.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iwa03.its.hawaii.edu:/usr/local/bin/appDaemon/app-common'
-              sh 'scp app-common cisd@iws03.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
+              sh 'scp app-common myiamd@iwa03.its.hawaii.edu:/usr/local/bin/appDaemon/app-common'
           }
       }
   }
