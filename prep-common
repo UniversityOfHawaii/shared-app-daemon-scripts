@@ -3,30 +3,29 @@
 #        user's webapps directory and set the group ownership
 #        and file permissions of the file so that the application daemon
 #        user can manipulate the file. 
-#        See 0-README.txt.
 #      - 09/23/08, Russell Tokuyama
 #
 # $Id$
 #
 # Mod: 
 #      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
-#      12/02/15, cahana@hawaii.edu; commented out check to ensure the user running the script is the daemon/app user
-#
+#      12/02/15, cahana@hawaii.edu; commented out check to ensure the user running the script is not the daemon/app user
 #
 # Preconditions:
 #   1. The distribution should be named like ${CTX_NAME}.war (see the
 #      code below).
 #   2. The user running this script must be in the same group as the
 #      $APP_USER.
-#   3. The user running this script must not be $APP_USER.
-#      
-#
 #
 # USAGE: (as your regular user in the directory where you have the
 #         distribution)
 #
 #   $ ~${APP_USER}/prep
 #
+# USAGE: (as daemon/app user in home directory where you have the
+#         distribution)
+#
+#   $ ./prep
 #
 #---------------------------------------------------------------------
 # Install:
@@ -101,9 +100,9 @@ chgrp ${APP_GRP} ${WEBAPPS_DIR}/${DIST}
 echo
 echo "Done."
 echo "Now switch to ${APP_USER} and do the following:"
-echo "  1. Stop the application, using \"app stop\""
+echo "  1. Stop the application, using \"sapp stop\" (i.e., \"sudo /bin/systemctl stop tomcat_${APP_USER}\")"
 echo "  2. Run the \"deploy\" command to redeploy the WAR file."
 echo "  3. Be sure that your app's configuration files are set properly."
-echo "  4. Start the application, using \"app start\""
+echo "  4. Start the application, using \"sapp start\" (i.e., \"sudo /bin/systemctl start tomcat_${APP_USER}\")"
 
 # eof: prep

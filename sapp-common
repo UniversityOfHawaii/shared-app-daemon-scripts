@@ -1,0 +1,47 @@
+#! /bin/bash
+# sapp - run systemctl on the app.
+#      06/20/28, jbeutel@hawaii.edu; for RHEL7 systemd
+#
+# $Id: 13ad0fdefc4624313021a4488f42616c53bc7aa1 $
+#---------------------------------------------------------------------
+# Spec:
+#   1. Run as the daemon user
+#   2. Returns
+#        0 if successfully starts or stops Tomcat, or status is running
+#        non-0 if Tomcat fails to start or stop, or status is not running
+#---------------------------------------------------------------------
+# Install:
+#   1. Install as sapp-common in /usr/local/bin.
+#   2. Symlink from /usr/local/bin/sapp-common to sapp in APP_USER's home dir.
+#   3. sudoers allows APP_USER to "/bin/systemctl {start|stop|status} tomcat_${APP_USER}"
+
+# You shouldn't need to change variable settings in this script;
+# you can override all variables like FOO=${FOO:-default} in the app.parameters file.
+
+set -u # treat expansion of unset variables (without a default) as an error
+
+# include parameters from same dir as this script
+PARAM_FILE=$(dirname $0)/app.parameters
+if [ ! -f $PARAM_FILE ]; then
+  echo "$PARAM_FILE not found" 1>&2
+  exit 5
+fi
+. $PARAM_FILE
+
+usage() {
+  echo "Usage: $0 { start | stop | status }" 1>&2
+  exit 1
+}
+
+if [ $# -ne 1 ]; then
+  usage
+fi
+case "$1" in
+'start' | 'stop' | 'status')
+  sudo /bin/systemctl $1 tomcat_${APP_USER}
+  ;;
+*)
+  usage
+  ;;
+esac
+# eof: sapp

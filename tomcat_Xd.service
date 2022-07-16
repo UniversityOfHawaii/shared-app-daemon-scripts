@@ -1,0 +1,25 @@
+# shared-app-daemon-scripts for RHEL7 /etc/systemd/system/tomcat_{{ user }}.service
+
+[Unit]
+Description=Apache Tomcat Application Server
+After=syslog.target network.target
+
+[Service]
+Type=forking
+
+User={{ user }}
+Group=tomcat
+
+Environment="CATALINA_PID=/home/{{ user }}/tomcat/pidfile"
+PIDFile=/home/{{ user }}/tomcat/pidfile
+
+ExecStart=/home/{{ user }}/app start
+ExecStop=/home/{{ user }}/app stop
+TimeoutStopSec=300s
+
+SuccessExitStatus=1
+SuccessExitStatus=143
+SuccessExitStatus=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

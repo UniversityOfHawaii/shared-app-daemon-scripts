@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # app - Run Tomcat servlet container.
 #     - 10/02/08, Russell Tokuyama (UH ITS)
 #
@@ -24,12 +24,13 @@
 #      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
 #      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
 #      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
+#      06/20/22, jbeutel@hawaii.edu; port for RHEL7 systemd
 #---------------------------------------------------------------------
 # Spec:
-#   1. Run as the daemon user.
+#   1. Run by systemd as the daemon user (Type=forking).
 #   2. Returns
-#        0 if successfully starts or checks that Tomcat is running
-#        1 if Tomcat not running
+#        0 if successfully starts or stops Tomcat
+#        non-0 if Tomcat fails to start or stop
 #---------------------------------------------------------------------
 # Install:
 #   1. Install as app-common in /usr/local/bin.
@@ -41,13 +42,42 @@
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
 
+set -u  # treat expansion of unset variables (without a default) as an error
+
+# Allow use only by systemd, so it always knows if this app is running.
+if [[ $(ps -p 1 -o comm | tail -1) != "systemd" ]]; then
+  echo "This app script is intended for running on a systemd platform such as RHEL7." 1>&2
+  exit 2
+fi
+DIR_WITH_THIS_SCRIPT=$(basename $(dirname $0))
+case "$DIR_WITH_THIS_SCRIPT" in
+'.') DIR_WITH_THIS_SCRIPT=$(basename $(pwd)) ;;
+'..') DIR_WITH_THIS_SCRIPT=$(basename $(dirname $(pwd))) ;;
+*) ;;
+esac
+GUESS_APP_USER=${DIR_WITH_THIS_SCRIPT}
+if [ $PPID -ne 1 ]; then
+  echo "Do not run this app script directly, so RHEL7 systemd can manage what is running; instead," 1>&2
+  echo "as the $GUESS_APP_USER user, use 'sudo /bin/systemctl {start|stop|status} tomcat_$GUESS_APP_USER'" 1>&2
+  echo "or './sapp {start|stop|status}'" 1>&2
+  exit 3
+fi
+
+# Require CATALINA_PID be defined in tomcat_$GUESS_APP_USER.service, not in $PARAM_FILE, to correspond with PIDFile to systemd.
+if [ -z "${CATALINA_PID:-}" ]; then
+  echo "CATALINA_PID Environment and PIDFile should be set in tomcat_${GUESS_APP_USER}.service file in /etc/systemd/system/" 1>&2
+  exit 4
+fi
+SAVED_CATALINA_PID=${CATALINA_PID}
+
 # include parameters from same dir as this script
 PARAM_FILE=`dirname $0`/app.parameters
-if [ ! -f $PARAM_FILE ] ; then
+if [ ! -f $PARAM_FILE ]; then
   echo "$PARAM_FILE not found" 1>&2
-  exit 1
+  exit 5
 fi
 . $PARAM_FILE
+CATALINA_PID=${SAVED_CATALINA_PID}  # preventing any override attempt by $PARAM_FILE
 
 # make sure we got the required parameter
 APP_USER=${APP_USER:?}
@@ -55,16 +85,16 @@ APP_USER=${APP_USER:?}
 # default wait for graceful Tomcat shutdown
 STOP_SECONDS=${STOP_SECONDS:-30}
 
-# default for YourKit CPU/memory profiling
-#YK_PORT=${YK_PORT:-`expr $JMX_PORT - 1000`} # by ITS convention
-#YK_HOME=${YK_HOME:-/usr/local/spkg/yjp-8.0.18}
+# let the following parameters be optional
+WAIT_PORTS=${WAIT_PORTS:-}
+JMX_HOST=${JMX_HOST:-}
+JMX_PORT=${JMX_PORT:-}
+
+# default wait for sockets on any WAIT_PORTS to close (so Tomcat can be successfully restarted)
+WAIT_PORTS_SECONDS=${WAIT_PORTS_SECONDS:-240}
 
 # default
-if [ `uname` = "SunOS" ]; then
-  APP_HOME=${APP_HOME:-/var/home/${APP_USER}}
-else
-  APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
-fi
+APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
 
 # default where Java and Tomcat are
 JAVA_HOME=${OVERRIDE_JAVA_HOME:-/usr/java/latest}
@@ -76,6 +106,9 @@ export JAVA_HOME CATALINA_BASE CATALINA_HOME
 LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
 APP_LOG=${APP_LOG:-${LOG_DIR}/app-err.log}
 
+# Log this script's stdout and stderr to $APP_LOG, as well as outputting to systemd for its logging.
+exec &> >(tee -a "$APP_LOG")
+
 #  Remove log files older than these many days; override in PARAM_FILE
 OLD_AGE=${OLD_AGE:-30}
 
@@ -85,19 +118,30 @@ JMX_PASSWORD_FILE=${JMX_PASSWORD_FILE:-${APP_HOME}/jmxremote.password}
 SOCKET_MBEAN_AGENT=${SOCKET_MBEAN_AGENT:-${APP_HOME}/common-1.17-socketStatisticsAgent.jar}
 
 # JVM won't run unless owner-only access to password file
-if [ -f $JMX_PASSWORD_FILE ] ; then
+if [ -f $JMX_PASSWORD_FILE ]; then
   chmod 0400 $JMX_PASSWORD_FILE
 fi
 
 CURR_USER=`id | sed 's/[^(]*(\([^)]*\)).*$/\1/'`
 
-if [ ${CURR_USER} != ${APP_USER} ] ; then
-  echo "You must change to the ${APP_USER} to run this command."
-  exit 1
+if [ ${CURR_USER} != ${APP_USER} ]; then
+  echo "This command must be run by systemd with User=${APP_USER}" 1>&2
+  exit 6
+fi
+
+# Prevent hidden, confusing overrides of the environment that is configured by this app script.
+if [ -f ${CATALINA_BASE}/bin/setenv.sh ]; then
+  echo "Remove (or move) ${CATALINA_BASE}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
+  echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
+  exit 7
+fi
+if [ -f ${CATALINA_HOME}/bin/setenv.sh ]; then
+  echo "Remove (or move) ${CATALINA_HOME}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
+  echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
+  exit 8
 fi
 
 #---------- other environment variables -------------
-CATALINA_PID=${CATALINA_PID:-${CATALINA_BASE}/pidfile}
 
 # default with HotSpot JIT (default); approximates default heap sizes.
 CATALINA_OPTS=${CATALINA_OPTS:-''}
@@ -159,37 +203,40 @@ ps_tomcat() {
 }
 
 echo_n() {
-  if [ `uname` = "SunOS" ]; then
-    /usr/ucb/echo -n $*
-  else
-    echo -n $*
-  fi
+  echo -n $*
 }
 
 netstat_port() {
-  if [ `uname` = "SunOS" ]; then
-    netstat -a | nawk -v hnp="[.]$1$" '$1 ~ hnp'
+  if [ -x /bin/ss ]; then    # for Jenkins on docci debian:stretch (no netstat)
+    /bin/ss -a | awk -v hnp=":$1$" '$5 ~ hnp'
   elif [ `uname` = "Darwin" ]; then     # macOS
     netstat -v -a -n | awk -v hnp="[.]$1$" '$4 ~ hnp'
-  else
+  else  # RHEL, etc
     netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
   fi
 }
 
 # parameters: 0 or more port numbers to wait on
 wait_for_ports_to_close() {
-  for PORT do
-    PORT_STATUS=`netstat_port $PORT`
-    if [ ! -z "$PORT_STATUS" ]; then
-      echo "Waiting for sockets on port $PORT to close..."
-      while [ ! -z "$PORT_STATUS" ]; do
-        echo $PORT_STATUS
-        sleep 7
-        PORT_STATUS=`netstat_port $PORT`
-      done
-    fi
-    echo "port $PORT is free"
-  done
+  if [ $# -eq 0 ]; then
+    echo "no ports to wait for sockets to close"
+  else
+    echo "Waiting up to $WAIT_PORTS_SECONDS seconds for sockets on ports $* to close..."
+    WAITED=0
+    for PORT do
+      PORT_STATUS=`netstat_port $PORT`
+      if [ ! -z "$PORT_STATUS" -a $WAITED -le $WAIT_PORTS_SECONDS ]; then
+        echo "Waiting for sockets on port $PORT to close..."
+        while [ ! -z "$PORT_STATUS" ]; do
+          echo $PORT_STATUS
+          sleep 3
+          WAITED=`expr $WAITED + 3`
+          PORT_STATUS=`netstat_port $PORT`
+        done
+      fi
+      echo "port $PORT is free"
+    done
+  fi
 }
 
 rotate() {
@@ -198,23 +245,22 @@ rotate() {
     cd $LOG_DIR
 
     echo "Creating backup directory, $LOG_DIR/$BKUP_DIR..."
-    mkdir $BKUP_DIR
-
-    if [ ! $? ] ; then
+    if ! mkdir $BKUP_DIR; then
         echo "Can't create $LOG_DIR/$BKUP_DIR."
         echo "Create one and move the log files there."
         return 1
     fi
 
     echo "Moving log files to $LOG_DIR/$BKUP_DIR..."
-    /bin/mv [ae]*txt *log catalina.out $BKUP_DIR 2> /dev/null
-    /bin/mv *log.? $BKUP_DIR 2> /dev/null
+    /bin/mv [ae]*txt *log *log.? catalina.out catalina.out-* $BKUP_DIR 2> /dev/null
 
     CNT=`ls $BKUP_DIR | wc -l`
     echo "$CNT files moved to $LOG_DIR/$BKUP_DIR"
 
-    echo "Compressing files in $LOG_DIR/$BKUP_DIR"
-    gzip -v $LOG_DIR/$BKUP_DIR/*
+    # Exclude APP_LOG from compression, because it is very small, and that would lose the rest of the output from this script.
+    APP_LOG_FILE=$(basename "$APP_LOG")
+    echo "Compressing files in $LOG_DIR/$BKUP_DIR (except $APP_LOG_FILE)"
+    gzip -v $(ls $LOG_DIR/$BKUP_DIR/* | grep -v "$APP_LOG_FILE")
     return 0
 }
 
@@ -229,18 +275,13 @@ age_logs() {
 }
 
 start() {
-	if [ "$1" = "yourkit" -a ! -z "$YK_PORT" ]; then
-		HOSTNAME=`hostname`
-		JAVA_OPTS="-agentpath:\
-$YK_HOME/bin/solaris-sparc-32/libyjpagent.so=disablestacktelemetry,\
-disableexceptiontelemetry,delay=10000,\
-sessionname=$HOSTNAME-$APP_USER,port=$YK_PORT $JAVA_OPTS"
-		echo "  JAVA_OPTS=$JAVA_OPTS"
-		export JAVA_OPTS
-	fi
-
-    echo "Starting Tomcat at `date`" | tee -a $APP_LOG
-    ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml >> $APP_LOG 2>&1
+    echo "Starting Tomcat at `date`"
+    ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml
+    STARTUP_EXIT_CODE=$?
+    if [ $STARTUP_EXIT_CODE != 0 ]; then
+      echo "Tomcat startup.sh exited with code $STARTUP_EXIT_CODE, app script giving up."
+      return $STARTUP_EXIT_CODE
+    fi
 
     sleep 3
 
@@ -249,9 +290,9 @@ sessionname=$HOSTNAME-$APP_USER,port=$YK_PORT $JAVA_OPTS"
         return 1
     fi
 
-    TC_PID=`cat_pid`
+    PID=`cat_pid`
 
-    if ps_tomcat $TC_PID; then
+    if ps_tomcat $PID; then
         echo "Tomcat started"
         return 0
     else
@@ -262,9 +303,13 @@ sessionname=$HOSTNAME-$APP_USER,port=$YK_PORT $JAVA_OPTS"
 
 
 stop() {
-    echo "Stopping Tomcat servlet container at `date`" | tee -a $APP_LOG
-    ${CATALINA_HOME}/bin/shutdown.sh >> $APP_LOG 2>&1
-    sleep 5
+    echo "Stopping Tomcat servlet container at `date`"
+    # Providing CATALINA_PID and $STOP_SECONDS, but not -force, so catalina.sh does a kill -3 thread dump on timeout.
+    ${CATALINA_HOME}/bin/shutdown.sh $STOP_SECONDS
+    SHUTDOWN_EXIT_CODE=$?
+    if [ $SHUTDOWN_EXIT_CODE != 0 ]; then
+      echo "Tomcat shutdown.sh exited with code $SHUTDOWN_EXIT_CODE, but app script will try, too."
+    fi
 
     PID=`cat_pid`
 
@@ -273,16 +318,6 @@ stop() {
     fi
 
     if [ ! -z "$PID" ]; then
-      if [ $STOP_SECONDS -gt 0 ]; then
-        echo_n "Waiting up to $STOP_SECONDS seconds for Tomcat to stop..."
-        WAITED=0
-        while ps_tomcat $PID > /dev/null && [ $WAITED -lt $STOP_SECONDS ]; do
-	  echo_n "."
-          sleep 3
-          WAITED=`expr $WAITED + 3`
-        done
-      fi
-
       if ps_tomcat $PID > /dev/null; then
         echo
         echo "Tomcat process is still running! Killing $PID..."
@@ -296,23 +331,14 @@ stop() {
 
     rotate
     age_logs
-    check
-}
 
-
-check() {
-    KEY=`cat_pid`
-    if [ -z "$KEY" ]; then
-        # no pid file
-        KEY=$APP_USER
-    fi
-
-    if ps_tomcat $KEY; then
-      return 0
+    if [ ! -z "$PID" ] && ps_tomcat $PID; then
+      echo "Tomcat still running after kill!"
+      return 1
     else
       echo "Tomcat not running."
       /bin/rm $CATALINA_PID 2> /dev/null
-      return 1
+      return 0
     fi
 }
 
@@ -324,16 +350,10 @@ case "$1" in
 'stop')
     stop
     ;;
-'check')
-    check
-    ;;
-'yourkit')
-	start yourkit
-	;;
 *)
-    echo "Usage: $0 { start | stop | check | yourkit }"
+    echo "Usage: $0 { start | stop }" 1>&2
+    exit 7
     ;;
 esac
-
 
 # eof: app

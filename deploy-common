@@ -1,7 +1,6 @@
 #! /bin/sh
 # deploy - Removes the old directory that the app's WAR file was expanded in
 #          to make sure that the new WAR file is deployed.
-#          See 0-README.txt.
 #        - 01/13/04, Russell Tokuyama
 #
 # $Id$
@@ -84,6 +83,6 @@ echo "Removing old work files from ${WORK_DIR}..."
 echo
 echo "Application deployed."
 echo
-echo "Start the application, using \"app start\""
+echo "Start the application, using \"sapp start\" (i.e., \"sudo /bin/systemctl start tomcat_${APP_USER}\")"
 
 # eof: deploy

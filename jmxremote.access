@@ -1,6 +1,6 @@
 # In 1.6.0_14, the following role can invoke methods, but not create anything.
 # That provides the security I want, while still supporting VisualVM.
-# So, SITAR is using write too, to resetCoutners() to get max stats.
+# Zabbix (via jmx_poller) is using write too, to resetCoutners() to get max stats.
 
 nonCreateRole readwrite
 
