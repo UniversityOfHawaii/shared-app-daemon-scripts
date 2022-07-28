@@ -1,8 +1,8 @@
 #! /bin/bash
-# sapp - run systemctl on the app.
+# sapp - run systemctl on the app, while following $APP_LOG.
 #      06/20/28, jbeutel@hawaii.edu; for RHEL7 systemd
 #
-# $Id: 13ad0fdefc4624313021a4488f42616c53bc7aa1 $
+# $Id$
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user
@@ -28,17 +28,39 @@ if [ ! -f $PARAM_FILE ]; then
 fi
 . $PARAM_FILE
 
+# make sure we got the required parameter
+APP_USER=${APP_USER:?}
+
+# defaults
+APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
+CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
+LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
+
+APP_LOG=${LOG_DIR}/app-err.log
+
 usage() {
   echo "Usage: $0 { start | stop | status }" 1>&2
   exit 1
+}
+
+follow() {
+  echo "Following $APP_LOG..."
+  tail -n 0 -F --pid=$$ $APP_LOG &
+}
+
+sapp() {
+  sudo /bin/systemctl $1 tomcat_${APP_USER}
 }
 
 if [ $# -ne 1 ]; then
   usage
 fi
 case "$1" in
-'start' | 'stop' | 'status')
-  sudo /bin/systemctl $1 tomcat_${APP_USER}
+'start' | 'stop')
+  follow && sapp $1
+  ;;
+'status')
+  sapp status
   ;;
 *)
   usage

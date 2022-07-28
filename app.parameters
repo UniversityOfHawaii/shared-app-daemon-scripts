@@ -57,3 +57,6 @@ CTX_NAME={{ context_name }}
 
 # override the number of days to age off log directories; default is 30 days
 #OLD_AGE=120
+
+# override disabling timeout waiting for good servlet startup; default is 900 seconds (15 minutes)
+#START_SECONDS=0

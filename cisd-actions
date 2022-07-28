@@ -9,7 +9,10 @@
 #     no-agent-forwarding,
 #     no-pty ssh-rsa AAAAB3....o9M9qz4xqGCqGXoJw= cisd@cis02
 #
+# $Id$
+#
 # jbeutel 2014-04-04
+# jbeutel 2022-07-27 update for RHEL7
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -69,37 +72,19 @@ soft-link() {
 }
 
 start() {
-    $BASE/app check && echo -e "\nError: already running" && return 1
-    START_SECONDS=600
-    CATALINA=tomcat/logs/catalina.out
-    preservePrevious "$CATALINA"    # redundant with app's rotate(), but anyway just in case
-    $BASE/app start
-    echo -e "\n$CATALINA:"
-    tail -F $CATALINA --pid=$$ &
-    WAITED=0
-    GOOD="INFO: Server startup in "
-    while ! fgrep "$GOOD" $CATALINA > /dev/null && [ $WAITED -lt $START_SECONDS ]; do
-        sleep 3
-        WAITED=`expr $WAITED + 3`
-    done
-    if fgrep "$GOOD" $CATALINA > /dev/null ; then
-        return 0
-    else
-        echo "Error: $CATALINA did not look good within $START_SECONDS seconds"
-        return 1
-    fi
+    $BASE/sapp start
 }
 
 stop() {
-    ! $BASE/app check && return 0   # if not running then no need to stop
+    ! status && echo "not running, so no need to stop" && return 0
     /usr/local/sbin/zm 15     # 15-minute Zabbix maintenance
     echo "Sleeping 20 seconds to let Zabbix recognize maintenance..."
     sleep 20
-    ! $BASE/app stop    # success if app has stopped
+    $BASE/sapp stop    # success if app has stopped
 }
 
-check() {
-    $BASE/app check
+status() {
+    $BASE/sapp status
 }
 
 dbdump() {
@@ -125,8 +110,8 @@ case "$1" in
 'stop')
     stop
     ;;
-'check')
-    check
+'check'|'status')
+    status
     ;;
 'deploy')
     deploy "$2"

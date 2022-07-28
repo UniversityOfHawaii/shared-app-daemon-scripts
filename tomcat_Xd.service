@@ -14,6 +14,7 @@ Environment="CATALINA_PID=/home/{{ user }}/tomcat/pidfile"
 PIDFile=/home/{{ user }}/tomcat/pidfile
 
 ExecStart=/home/{{ user }}/app start
+TimeoutStartSec=960s
 ExecStop=/home/{{ user }}/app stop
 TimeoutStopSec=300s
 

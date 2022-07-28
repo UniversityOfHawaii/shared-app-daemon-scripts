@@ -25,12 +25,13 @@
 #      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
 #      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
 #      06/20/22, jbeutel@hawaii.edu; port for RHEL7 systemd
+#      07/19/22, jbeutel@hawaii.edu; add check_context_startup()
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
 #   2. Returns
-#        0 if successfully starts or stops Tomcat
-#        non-0 if Tomcat fails to start or stop
+#        0 if successfully starts or stops Tomcat and context
+#        non-0 if Tomcat or context fails to start or stop
 #---------------------------------------------------------------------
 # Install:
 #   1. Install as app-common in /usr/local/bin.
@@ -93,6 +94,9 @@ JMX_PORT=${JMX_PORT:-}
 # default wait for sockets on any WAIT_PORTS to close (so Tomcat can be successfully restarted)
 WAIT_PORTS_SECONDS=${WAIT_PORTS_SECONDS:-240}
 
+# default wait for context to look good after starting Tomcat, less than TimeoutStartSec in tomcat_${APP_USER}.service
+START_SECONDS=${START_SECONDS:-900}
+
 # default
 APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
 
@@ -104,7 +108,7 @@ export JAVA_HOME CATALINA_BASE CATALINA_HOME
 
 # default log locations
 LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
-APP_LOG=${APP_LOG:-${LOG_DIR}/app-err.log}
+APP_LOG=${LOG_DIR}/app-err.log
 
 # Log this script's stdout and stderr to $APP_LOG, as well as outputting to systemd for its logging.
 exec &> >(tee -a "$APP_LOG")
@@ -202,10 +206,6 @@ ps_tomcat() {
     ps -ef | grep $1 | grep java | grep util.logging
 }
 
-echo_n() {
-  echo -n $*
-}
-
 netstat_port() {
   if [ -x /bin/ss ]; then    # for Jenkins on docci debian:stretch (no netstat)
     /bin/ss -a | awk -v hnp=":$1$" '$5 ~ hnp'
@@ -240,27 +240,38 @@ wait_for_ports_to_close() {
 }
 
 rotate() {
+    pushd $LOG_DIR > /dev/null
+    APP_LOG_FILE=$(basename "$APP_LOG")
+    LOG_FILES=$(ls [ae]*txt *log *log.? catalina.out catalina.out-* 2> /dev/null | grep -v "^$APP_LOG_FILE$")
+    if [ -z "$LOG_FILES" ]; then
+        # no files to rotate, so don't create $BKUP_DIR (normal for starting)
+        popd > /dev/null
+        return 0
+    fi
+
     BKUP_DIR=`date '+%y%m%d-%H%M'`
-
-    cd $LOG_DIR
-
     echo "Creating backup directory, $LOG_DIR/$BKUP_DIR..."
     if ! mkdir $BKUP_DIR; then
         echo "Can't create $LOG_DIR/$BKUP_DIR."
-        echo "Create one and move the log files there."
+        echo "Create one and move the log files there (or, if it already exists, then wait a minute and try again)."
+        popd > /dev/null
         return 1
     fi
 
     echo "Moving log files to $LOG_DIR/$BKUP_DIR..."
-    /bin/mv [ae]*txt *log *log.? catalina.out catalina.out-* $BKUP_DIR 2> /dev/null
+    /bin/mv $LOG_FILES $BKUP_DIR
 
     CNT=`ls $BKUP_DIR | wc -l`
     echo "$CNT files moved to $LOG_DIR/$BKUP_DIR"
 
-    # Exclude APP_LOG from compression, because it is very small, and that would lose the rest of the output from this script.
-    APP_LOG_FILE=$(basename "$APP_LOG")
-    echo "Compressing files in $LOG_DIR/$BKUP_DIR (except $APP_LOG_FILE)"
-    gzip -v $(ls $LOG_DIR/$BKUP_DIR/* | grep -v "$APP_LOG_FILE")
+    echo "Compressing files in $LOG_DIR/$BKUP_DIR"
+    gzip -v $LOG_DIR/$BKUP_DIR/*
+
+    # Rotate $APP_LOG only after this script exits, so that tee and tail don't miss anything,
+    if [ $1 = "stopping" ]; then  # and not on starting, so $APP_LOG will correspond with the other log files.
+        trap '/bin/mv "$APP_LOG" "$LOG_DIR/$BKUP_DIR" && gzip "$LOG_DIR/$BKUP_DIR/$APP_LOG_FILE"' EXIT
+    fi
+    popd > /dev/null
     return 0
 }
 
@@ -275,39 +286,76 @@ age_logs() {
 }
 
 start() {
+    # Make sure $LOG_DIR has no old catalina.out, to get a correct check_context_startup, in case the previous stop was ungraceful.
+    if ! rotate starting; then
+      echo "Has leftover log files but cannot rotate them; app script giving up."
+      echo -e "\n\n" && return 9
+    fi
+
     echo "Starting Tomcat at `date`"
     ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml
     STARTUP_EXIT_CODE=$?
-    if [ $STARTUP_EXIT_CODE != 0 ]; then
+    if [ $STARTUP_EXIT_CODE -ne 0 ]; then
       echo "Tomcat startup.sh exited with code $STARTUP_EXIT_CODE, app script giving up."
-      return $STARTUP_EXIT_CODE
+      echo -e "\n\n" && return $STARTUP_EXIT_CODE
     fi
 
     sleep 3
 
     if [ ! -f $CATALINA_PID ]; then
         echo "Tomcat not started (pid file not found)"
-        return 1
+        echo -e "\n\n" && return 1
     fi
 
     PID=`cat_pid`
 
     if ps_tomcat $PID; then
-        echo "Tomcat started"
-        return 0
+        echo "Tomcat started; now checking for good context startup..."
+        check_context_startup
+        CONTEXT_RESULT=$?
+        if [ $CONTEXT_RESULT -ne 0 ]; then
+            echo -e "\nContext startup failed; trying a graceful shutdown..."
+            # Call stop in a group command, {}, not in a subshell, (), because a subshell would trigger the EXIT trap.
+            { stop && echo -n "Tomcat stopped, "; } || echo -n "Tomcat not stopped, "
+            echo "after context startup failed.  Exiting with error code $CONTEXT_RESULT."
+        fi
+        echo -e "\n\n" && return $CONTEXT_RESULT
     else
         echo "Tomcat not started"
-        return 1
+        echo -e "\n\n" && return 1
     fi
 }
 
+check_context_startup() {
+    CATALINA=$LOG_DIR/catalina.out
+    echo -e "\nFollowing $CATALINA..."
+    tail -F $CATALINA --pid=$$ &  # to stdout and $APP_LOG, while we're waiting on it
+    TAIL_PID=$!
+    WAITED=0
+    BAD="^SEVERE: Context .* startup failed"
+    GOOD="^INFO: Server startup in "
+    while ! grep -q "${BAD}\|${GOOD}" $CATALINA && [ $START_SECONDS -eq 0 -o $WAITED -lt $START_SECONDS ]; do
+        sleep 1
+        WAITED=`expr $WAITED + 1`
+    done
+    kill $TAIL_PID
+    if grep "$BAD" $CATALINA ; then
+        return 10
+    elif grep -q "$GOOD" $CATALINA ; then
+        echo "Context startup looks good."
+        return 0
+    else
+        echo "Error: $CATALINA did not look good within $START_SECONDS seconds"
+        return 11
+    fi
+}
 
 stop() {
     echo "Stopping Tomcat servlet container at `date`"
-    # Providing CATALINA_PID and $STOP_SECONDS, but not -force, so catalina.sh does a kill -3 thread dump on timeout.
+    # Providing CATALINA_PID and $STOP_SECONDS, but not -force, so Tomcat 8 catalina.sh does a kill -3 thread dump on timeout.
     ${CATALINA_HOME}/bin/shutdown.sh $STOP_SECONDS
     SHUTDOWN_EXIT_CODE=$?
-    if [ $SHUTDOWN_EXIT_CODE != 0 ]; then
+    if [ $SHUTDOWN_EXIT_CODE -ne 0 ]; then
       echo "Tomcat shutdown.sh exited with code $SHUTDOWN_EXIT_CODE, but app script will try, too."
     fi
 
@@ -329,7 +377,7 @@ stop() {
     fi
     wait_for_ports_to_close $WAIT_PORTS
 
-    rotate
+    rotate stopping
     age_logs
 
     if [ ! -z "$PID" ] && ps_tomcat $PID; then
@@ -352,7 +400,7 @@ case "$1" in
     ;;
 *)
     echo "Usage: $0 { start | stop }" 1>&2
-    exit 7
+    exit 12
     ;;
 esac
 
