@@ -1,4 +1,4 @@
-# app.parameters - include from app, prep, and deploy scripts.
+# app.parameters - include from app, sapp, prep, and deploy scripts.
 # Try to avoid modifying those scripts, to make them easier to maintain.
 #
 # $Id$
@@ -52,7 +52,7 @@ CTX_NAME={{ context_name }}
 #CATALINA_BASE=${APP_HOME:?}/tomcat
 #CATALINA_HOME=/usr/local/pkg/tomcat
 
-# override for file version, altho the file itself is optional
+# set if compatible, for wait stats in Zabbix, altho the file itself is optional
 #SOCKET_MBEAN_AGENT=${APP_HOME:?}/common-1.17-socketStatisticsAgent.jar
 
 # override the number of days to age off log directories; default is 30 days

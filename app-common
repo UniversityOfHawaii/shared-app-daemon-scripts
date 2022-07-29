@@ -26,6 +26,7 @@
 #      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
 #      06/20/22, jbeutel@hawaii.edu; port for RHEL7 systemd
 #      07/19/22, jbeutel@hawaii.edu; add check_context_startup()
+#      07/28/22, jbeutel@hawaii.edu; default to no socketStatisticsAgent.jar
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -119,7 +120,9 @@ OLD_AGE=${OLD_AGE:-30}
 # default JMX monitoring files, using absolute paths just in case
 JMX_ACCESS_FILE=${JMX_ACCESS_FILE:-${APP_HOME}/jmxremote.access}
 JMX_PASSWORD_FILE=${JMX_PASSWORD_FILE:-${APP_HOME}/jmxremote.password}
-SOCKET_MBEAN_AGENT=${SOCKET_MBEAN_AGENT:-${APP_HOME}/common-1.17-socketStatisticsAgent.jar}
+
+# Stop defaulting this, because it may be incompatible with Tomcat 8 or later.
+#SOCKET_MBEAN_AGENT=${SOCKET_MBEAN_AGENT:-${APP_HOME}/common-1.17-socketStatisticsAgent.jar}
 
 # JVM won't run unless owner-only access to password file
 if [ -f $JMX_PASSWORD_FILE ]; then
@@ -180,15 +183,15 @@ if [ ! -z "$JMX_PORT" ]; then
   CO="$CO -Dcom.sun.management.jmxremote.authenticate=true"
   CO="$CO -Dcom.sun.management.jmxremote.access.file=$JMX_ACCESS_FILE"
   CO="$CO -Dcom.sun.management.jmxremote.password.file=$JMX_PASSWORD_FILE"
+
+  # optional socket wait stats for Zabbix.  This is a risky, low-level hack,
+  # so you should not set $SOCKET_MBEAN_AGENT if it messes up any networking.
+  if [ -f "${SOCKET_MBEAN_AGENT:-}" ]; then
+    CO="$CO -javaagent:$SOCKET_MBEAN_AGENT"
+  fi
 fi
 if [ ! -z "$JMX_HOST" ]; then
   CO="$CO -Djava.rmi.server.hostname=$JMX_HOST"
-fi
-
-# optional socket wait stats for Zabbix.  This is a risky, low-level hack,
-# so you should rm the $SOCKET_MBEAN_AGENT file if it messes up any networking.
-if [ -f $SOCKET_MBEAN_AGENT ]; then
-  CO="$CO -javaagent:$SOCKET_MBEAN_AGENT"
 fi
 
 PATH=${JAVA_HOME}/bin:${PATH}

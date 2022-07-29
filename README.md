@@ -33,7 +33,6 @@ $ ls -l /usr/local/bin/appDaemon
 total 198
 -rwxrwxr-x   1 root     root        8445 Aug  5 11:23 app-common
 -rw-r--r--   1 root     root        2047 Aug  5 10:50 app.parameters
--rw-r--r--   1 root     root       78267 Mar  3 11:17 common-1.17-socketStatisticsAgent.jar
 -rwxrwxr-x   1 root     root        2812 Aug  5 11:23 deploy-common
 -rw-r--r--   1 root     root         945 Mar  3 11:17 jmxremote.access
 -rw-r--r--   1 root     root         430 Mar  3 11:17 jmxremote.password
