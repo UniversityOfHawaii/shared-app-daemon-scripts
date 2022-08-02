@@ -172,7 +172,6 @@ CO="$CO $VERBOSE_GC"
 #CO="$CO -XX:+UseParallelOldGC"
 #CO="$CO -XX:+UseConcMarkSweepGC"
 
-
 # additional options for JMX (for management via VisualVM or Zabbix)
 if [ ! -z "$JMX_PORT" ]; then
   CO="$CO -Dcom.sun.management.jmxremote.port=$JMX_PORT"
@@ -183,15 +182,15 @@ if [ ! -z "$JMX_PORT" ]; then
   CO="$CO -Dcom.sun.management.jmxremote.authenticate=true"
   CO="$CO -Dcom.sun.management.jmxremote.access.file=$JMX_ACCESS_FILE"
   CO="$CO -Dcom.sun.management.jmxremote.password.file=$JMX_PASSWORD_FILE"
+  if [ ! -z "$JMX_HOST" ]; then
+    CO="$CO -Djava.rmi.server.hostname=$JMX_HOST"
+  fi
 
   # optional socket wait stats for Zabbix.  This is a risky, low-level hack,
   # so you should not set $SOCKET_MBEAN_AGENT if it messes up any networking.
   if [ -f "${SOCKET_MBEAN_AGENT:-}" ]; then
     CO="$CO -javaagent:$SOCKET_MBEAN_AGENT"
   fi
-fi
-if [ ! -z "$JMX_HOST" ]; then
-  CO="$CO -Djava.rmi.server.hostname=$JMX_HOST"
 fi
 
 PATH=${JAVA_HOME}/bin:${PATH}
