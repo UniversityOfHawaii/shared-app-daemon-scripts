@@ -61,7 +61,7 @@ case "$1" in
   follow && sapp start
   ;;
 'stop')
-  follow && ! { sapp stop || ! sapp status }
+  follow && ! { sapp stop || ! sapp status ; }
   ;;
 'check'|'status')
   sapp status
