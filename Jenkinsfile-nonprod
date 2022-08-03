@@ -6,18 +6,18 @@ pipeline {
   stages {
       stage('SCP *-common') {
           steps {
-              sh 'scp *-common cisd@its93.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its94.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its95.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its96.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its97.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its99.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iwa73.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iws73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iwa43.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iws43.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iwa71.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iws71.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp *-common cisd@its60.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp *-common cisd@its70.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp *-common cisd@its71.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp *-common cisd@its72.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp *-common cisd@its73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp *-common cisd@sec90.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iwa73.its.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iws73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iwa43.its.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iws43.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iwa71.its.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iws71.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
           }
       }
   }

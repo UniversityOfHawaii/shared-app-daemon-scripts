@@ -6,18 +6,15 @@ pipeline {
   stages {
       stage('SCP *-common') {
           steps {
-              sh 'scp *-common cisd@its03.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its12.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its13.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its21.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its22.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its23.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its25.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@sec02.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iws03.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iwa03.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iwa01.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common myiamd@iws01.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common cisd@its30.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common cisd@its31.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common cisd@its32.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common cisd@its33.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common cisd@sec10.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iws03.its.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iwa03.its.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iwa01.its.hawaii.edu:/usr/local/bin/appDaemon/'
+//              sh 'scp *-common myiamd@iws01.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
           }
       }
   }
