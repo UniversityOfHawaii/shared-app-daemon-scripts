@@ -406,5 +406,4 @@ case "$1" in
     exit 12
     ;;
 esac
-
-# eof: app
+# eof: sapp

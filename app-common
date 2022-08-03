@@ -70,4 +70,4 @@ case "$1" in
   usage
   ;;
 esac
-# eof: sapp
+# eof: app
