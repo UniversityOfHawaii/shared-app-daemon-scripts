@@ -1,69 +1,409 @@
 #! /bin/bash
-# sapp - run systemctl on the app, while following $APP_LOG.
-#      06/20/28, jbeutel@hawaii.edu; for RHEL7 systemd
+# app - Run Tomcat servlet container.
+#     - 10/02/08, Russell Tokuyama (UH ITS)
 #
 # $Id$
+#
+# Mod: 11/25/08, russ@hawaii.edu; Silenced error output of kill.
+#      12/10/08, jbeutel@hawaii.edu; added JMX and wait for stop before kill
+#      04/06/09, jbeutel@hawaii.edu; updated JMX config
+#      07/10/09, russ@hawaii.edu; Fixed ps_tomcat to find the JVM process
+#      09/14/09, jbeutel@hawaii.edu; use out-of-the-box JMX auth instead of single-port agent
+#      09/15/09, jbeutel@hawaii.edu; optionally specify garbage collector for load testing
+#      09/17/09, jbeutel@hawaii.edu; optional socket MBean agent for statistics only (no logging)
+#      11/04/09, jbeutel@hawaii.edu; added YourKit option & updated versions
+#      12/02/09, jbeutel@hawaii.edu; specify private network for JMX callback
+#      02/22/10, jbeutel@hawaii.edu; on stop wait for listening port to close
+#      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
+#      07/12/13, jbeutel@hawaii.edu; updated default jdk to Solaris 1.6.0_51
+#      12/02/15, cahana@hawaii.edu; merged with app script from the current RHEL servers
+#      12/04/16, jbeutel@hawaii.edu; added JMX_RMI_PORT & updated defaults
+#      04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
+#      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
+#      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
+#      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
+#      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
+#      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
+#      06/20/22, jbeutel@hawaii.edu; port for RHEL7 systemd
+#      07/19/22, jbeutel@hawaii.edu; add check_context_startup()
+#      07/28/22, jbeutel@hawaii.edu; default to no socketStatisticsAgent.jar
 #---------------------------------------------------------------------
 # Spec:
-#   1. Run as the daemon user
+#   1. Run by systemd as the daemon user (Type=forking).
 #   2. Returns
-#        0 if successfully starts or stops Tomcat, or status is running
-#        non-0 if Tomcat fails to start or stop, or status is not running
+#        0 if successfully starts or stops Tomcat and context
+#        non-0 if Tomcat or context fails to start or stop
 #---------------------------------------------------------------------
 # Install:
-#   1. Install as sapp-common in /usr/local/bin.
-#   2. Symlink from /usr/local/bin/sapp-common to sapp in APP_USER's home dir.
-#   3. sudoers allows APP_USER to "/bin/systemctl {start|stop|status} tomcat_${APP_USER}"
+#   1. Install as app-common in /usr/local/bin.
+#   2. Symlink from /usr/local/bin/app-common to app in APP_USER's home dir.
+#   3. For convenience, add APP_USER's home dir to PATH env var.
+#---------------------------------------------------------------------
+#
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
 
-set -u # treat expansion of unset variables (without a default) as an error
+set -u  # treat expansion of unset variables (without a default) as an error
+
+# Allow use only by systemd, so it always knows if this app is running.
+if [[ $(ps -p 1 -o comm | tail -1) != "systemd" ]]; then
+  echo "This app script is intended for running on a systemd platform such as RHEL7." 1>&2
+  exit 2
+fi
+DIR_WITH_THIS_SCRIPT=$(basename $(dirname $0))
+case "$DIR_WITH_THIS_SCRIPT" in
+'.') DIR_WITH_THIS_SCRIPT=$(basename $(pwd)) ;;
+'..') DIR_WITH_THIS_SCRIPT=$(basename $(dirname $(pwd))) ;;
+*) ;;
+esac
+GUESS_APP_USER=${DIR_WITH_THIS_SCRIPT}
+if [ $PPID -ne 1 ]; then
+  echo "Do not run this app script directly, so RHEL7 systemd can manage what is running; instead," 1>&2
+  echo "as the $GUESS_APP_USER user, use 'sudo /bin/systemctl {start|stop|status} tomcat_$GUESS_APP_USER'" 1>&2
+  echo "or './sapp {start|stop|status}'" 1>&2
+  exit 3
+fi
+
+# Require CATALINA_PID be defined in tomcat_$GUESS_APP_USER.service, not in $PARAM_FILE, to correspond with PIDFile to systemd.
+if [ -z "${CATALINA_PID:-}" ]; then
+  echo "CATALINA_PID Environment and PIDFile should be set in tomcat_${GUESS_APP_USER}.service file in /etc/systemd/system/" 1>&2
+  exit 4
+fi
+SAVED_CATALINA_PID=${CATALINA_PID}
 
 # include parameters from same dir as this script
-PARAM_FILE=$(dirname $0)/app.parameters
+PARAM_FILE=`dirname $0`/app.parameters
 if [ ! -f $PARAM_FILE ]; then
   echo "$PARAM_FILE not found" 1>&2
   exit 5
 fi
 . $PARAM_FILE
+CATALINA_PID=${SAVED_CATALINA_PID}  # preventing any override attempt by $PARAM_FILE
 
 # make sure we got the required parameter
 APP_USER=${APP_USER:?}
 
-# defaults
-APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
-CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
-LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
+# default wait for graceful Tomcat shutdown
+STOP_SECONDS=${STOP_SECONDS:-30}
 
+# let the following parameters be optional
+WAIT_PORTS=${WAIT_PORTS:-}
+JMX_HOST=${JMX_HOST:-}
+JMX_PORT=${JMX_PORT:-}
+
+# default wait for sockets on any WAIT_PORTS to close (so Tomcat can be successfully restarted)
+WAIT_PORTS_SECONDS=${WAIT_PORTS_SECONDS:-240}
+
+# default wait for context to look good after starting Tomcat, less than TimeoutStartSec in tomcat_${APP_USER}.service
+START_SECONDS=${START_SECONDS:-900}
+
+# default
+APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
+
+# default where Java and Tomcat are
+JAVA_HOME=${OVERRIDE_JAVA_HOME:-/usr/java/latest}
+CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
+CATALINA_HOME=${CATALINA_HOME:-/usr/local/pkg/tomcat}
+export JAVA_HOME CATALINA_BASE CATALINA_HOME
+
+# default log locations
+LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
 APP_LOG=${LOG_DIR}/app-err.log
 
-usage() {
-  echo "Usage: $0 { start | stop | status }" 1>&2
-  exit 1
-}
+# Log this script's stdout and stderr to $APP_LOG, as well as outputting to systemd for its logging.
+exec &> >(tee -a "$APP_LOG")
 
-follow() {
-  echo "Following $APP_LOG..."
-  tail -n 0 -F --pid=$$ $APP_LOG &
-}
+#  Remove log files older than these many days; override in PARAM_FILE
+OLD_AGE=${OLD_AGE:-30}
 
-sapp() {
-  sudo /bin/systemctl $1 tomcat_${APP_USER}
-}
+# default JMX monitoring files, using absolute paths just in case
+JMX_ACCESS_FILE=${JMX_ACCESS_FILE:-${APP_HOME}/jmxremote.access}
+JMX_PASSWORD_FILE=${JMX_PASSWORD_FILE:-${APP_HOME}/jmxremote.password}
 
-if [ $# -ne 1 ]; then
-  usage
+# Stop defaulting this, because it may be incompatible with Tomcat 8 or later.
+#SOCKET_MBEAN_AGENT=${SOCKET_MBEAN_AGENT:-${APP_HOME}/common-1.17-socketStatisticsAgent.jar}
+
+# JVM won't run unless owner-only access to password file
+if [ -f $JMX_PASSWORD_FILE ]; then
+  chmod 0400 $JMX_PASSWORD_FILE
 fi
+
+CURR_USER=`id | sed 's/[^(]*(\([^)]*\)).*$/\1/'`
+
+if [ ${CURR_USER} != ${APP_USER} ]; then
+  echo "This command must be run by systemd with User=${APP_USER}" 1>&2
+  exit 6
+fi
+
+# Prevent hidden, confusing overrides of the environment that is configured by this app script.
+if [ -f ${CATALINA_BASE}/bin/setenv.sh ]; then
+  echo "Remove (or move) ${CATALINA_BASE}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
+  echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
+  exit 7
+fi
+if [ -f ${CATALINA_HOME}/bin/setenv.sh ]; then
+  echo "Remove (or move) ${CATALINA_HOME}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
+  echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
+  exit 8
+fi
+
+#---------- other environment variables -------------
+
+# default with HotSpot JIT (default); approximates default heap sizes.
+CATALINA_OPTS=${CATALINA_OPTS:-''}
+JVM_HEAP=${JVM_HEAP:-'-Xms64m -Xmx128m'}
+CO="$JVM_HEAP $CATALINA_OPTS"
+
+# default avoidance of broken SSL
+JVM_SECURITY=${JVM_SECURITY:-'-Djsse.enableSNIExtension=false'}
+CO="$CO $JVM_SECURITY"
+
+# the following CATALINA_OPTS are added in a way that cannot be overridden
+CO="$CO -server"
+
+#   additional options for verbose:gc
+VERBOSE_GC=${VERBOSE_GC:-'-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+HeapDumpOnOutOfMemoryError'}
+CO="$CO $VERBOSE_GC"
+
+# optionally specify a garbage collector, for load testing
+#CO="$CO -XX:+UseSerialGC"
+#CO="$CO -XX:+UseParallelGC"
+#CO="$CO -XX:+UseParallelOldGC"
+#CO="$CO -XX:+UseConcMarkSweepGC"
+
+# additional options for JMX (for management via VisualVM or Zabbix)
+if [ ! -z "$JMX_PORT" ]; then
+  CO="$CO -Dcom.sun.management.jmxremote.port=$JMX_PORT"
+  JMX_RMI_PORT=${JMX_RMI_PORT:-`expr $JMX_PORT + 100`}  # default to ITS convention, if not given
+  WAIT_PORTS="${WAIT_PORTS} $JMX_RMI_PORT"  # add defaulted port (even though it's redundant if not defaulted)
+  CO="$CO -Dcom.sun.management.jmxremote.rmi.port=$JMX_RMI_PORT"
+  CO="$CO -Dcom.sun.management.jmxremote.ssl=false"
+  CO="$CO -Dcom.sun.management.jmxremote.authenticate=true"
+  CO="$CO -Dcom.sun.management.jmxremote.access.file=$JMX_ACCESS_FILE"
+  CO="$CO -Dcom.sun.management.jmxremote.password.file=$JMX_PASSWORD_FILE"
+  if [ ! -z "$JMX_HOST" ]; then
+    CO="$CO -Djava.rmi.server.hostname=$JMX_HOST"
+  fi
+
+  # optional socket wait stats for Zabbix.  This is a risky, low-level hack,
+  # so you should not set $SOCKET_MBEAN_AGENT if it messes up any networking.
+  if [ -f "${SOCKET_MBEAN_AGENT:-}" ]; then
+    CO="$CO -javaagent:$SOCKET_MBEAN_AGENT"
+  fi
+fi
+
+PATH=${JAVA_HOME}/bin:${PATH}
+
+CATALINA_OPTS=$CO
+export CATALINA_PID CATALINA_OPTS PATH
+
+#-------------------- helpers -----------------------
+
+cat_pid() {
+    cat ${CATALINA_PID} 2> /dev/null
+}
+
+ps_tomcat() {
+    ps -ef | grep $1 | grep java | grep util.logging
+}
+
+netstat_port() {
+  if [ -x /bin/ss ]; then    # for Jenkins on docci debian:stretch (no netstat)
+    /bin/ss -a | awk -v hnp=":$1$" '$5 ~ hnp'
+  elif [ `uname` = "Darwin" ]; then     # macOS
+    netstat -v -a -n | awk -v hnp="[.]$1$" '$4 ~ hnp'
+  else  # RHEL, etc
+    netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
+  fi
+}
+
+# parameters: 0 or more port numbers to wait on
+wait_for_ports_to_close() {
+  if [ $# -eq 0 ]; then
+    echo "no ports to wait for sockets to close"
+  else
+    echo "Waiting up to $WAIT_PORTS_SECONDS seconds for sockets on ports $* to close..."
+    WAITED=0
+    for PORT do
+      PORT_STATUS=`netstat_port $PORT`
+      if [ ! -z "$PORT_STATUS" -a $WAITED -le $WAIT_PORTS_SECONDS ]; then
+        echo "Waiting for sockets on port $PORT to close..."
+        while [ ! -z "$PORT_STATUS" ]; do
+          echo $PORT_STATUS
+          sleep 3
+          WAITED=`expr $WAITED + 3`
+          PORT_STATUS=`netstat_port $PORT`
+        done
+      fi
+      echo "port $PORT is free"
+    done
+  fi
+}
+
+rotate() {
+    pushd $LOG_DIR > /dev/null
+    APP_LOG_FILE=$(basename "$APP_LOG")
+    LOG_FILES=$(ls [ae]*txt *log *log.? catalina.out catalina.out-* 2> /dev/null | grep -v "^$APP_LOG_FILE$")
+    if [ -z "$LOG_FILES" ]; then
+        # no files to rotate, so don't create $BKUP_DIR (normal for starting)
+        popd > /dev/null
+        return 0
+    fi
+
+    BKUP_DIR=`date '+%y%m%d-%H%M'`
+    echo "Creating backup directory, $LOG_DIR/$BKUP_DIR..."
+    if ! mkdir $BKUP_DIR; then
+        echo "Can't create $LOG_DIR/$BKUP_DIR."
+        echo "Create one and move the log files there (or, if it already exists, then wait a minute and try again)."
+        popd > /dev/null
+        return 1
+    fi
+
+    echo "Moving log files to $LOG_DIR/$BKUP_DIR..."
+    /bin/mv $LOG_FILES $BKUP_DIR
+
+    CNT=`ls $BKUP_DIR | wc -l`
+    echo "$CNT files moved to $LOG_DIR/$BKUP_DIR"
+
+    echo "Compressing files in $LOG_DIR/$BKUP_DIR"
+    gzip -v $LOG_DIR/$BKUP_DIR/*
+
+    # Rotate $APP_LOG only after this script exits, so that tee and tail don't miss anything,
+    if [ $1 = "stopping" ]; then  # and not on starting, so $APP_LOG will correspond with the other log files.
+        trap '/bin/mv "$APP_LOG" "$LOG_DIR/$BKUP_DIR" && gzip "$LOG_DIR/$BKUP_DIR/$APP_LOG_FILE"' EXIT
+    fi
+    popd > /dev/null
+    return 0
+}
+
+
+age_logs() {
+    echo "Aging off log files older than [$OLD_AGE] in [$LOG_DIR]..."
+
+    # Find directories in the current directory older than $OLD_AGE
+    # and remove them, their contents, and say their name.
+    #
+    find $LOG_DIR -maxdepth 1 -type d -mtime +${OLD_AGE} -print -exec rm -rf {} \;
+}
+
+start() {
+    # Make sure $LOG_DIR has no old catalina.out, to get a correct check_context_startup, in case the previous stop was ungraceful.
+    if ! rotate starting; then
+      echo "Has leftover log files but cannot rotate them; app script giving up."
+      echo -e "\n\n" && return 9
+    fi
+
+    echo "Starting Tomcat at `date`"
+    ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml
+    STARTUP_EXIT_CODE=$?
+    if [ $STARTUP_EXIT_CODE -ne 0 ]; then
+      echo "Tomcat startup.sh exited with code $STARTUP_EXIT_CODE, app script giving up."
+      echo -e "\n\n" && return $STARTUP_EXIT_CODE
+    fi
+
+    sleep 3
+
+    if [ ! -f $CATALINA_PID ]; then
+        echo "Tomcat not started (pid file not found)"
+        echo -e "\n\n" && return 1
+    fi
+
+    PID=`cat_pid`
+
+    if ps_tomcat $PID; then
+        echo "Tomcat started; now checking for good context startup..."
+        check_context_startup
+        CONTEXT_RESULT=$?
+        if [ $CONTEXT_RESULT -ne 0 ]; then
+            echo -e "\nContext startup failed; trying a graceful shutdown..."
+            # Call stop in a group command, {}, not in a subshell, (), because a subshell would trigger the EXIT trap.
+            { stop && echo -n "Tomcat stopped, "; } || echo -n "Tomcat not stopped, "
+            echo "after context startup failed.  Exiting with error code $CONTEXT_RESULT."
+        fi
+        echo -e "\n\n" && return $CONTEXT_RESULT
+    else
+        echo "Tomcat not started"
+        echo -e "\n\n" && return 1
+    fi
+}
+
+check_context_startup() {
+    CATALINA=$LOG_DIR/catalina.out
+    echo -e "\nFollowing $CATALINA..."
+    tail -F $CATALINA --pid=$$ &  # to stdout and $APP_LOG, while we're waiting on it
+    TAIL_PID=$!
+    WAITED=0
+    BAD="^SEVERE: Context .* startup failed"
+    GOOD="^INFO: Server startup in "
+    while ! grep -q "${BAD}\|${GOOD}" $CATALINA && [ $START_SECONDS -eq 0 -o $WAITED -lt $START_SECONDS ]; do
+        sleep 1
+        WAITED=`expr $WAITED + 1`
+    done
+    kill $TAIL_PID
+    if grep "$BAD" $CATALINA ; then
+        return 10
+    elif grep -q "$GOOD" $CATALINA ; then
+        echo "Context startup looks good."
+        return 0
+    else
+        echo "Error: $CATALINA did not look good within $START_SECONDS seconds"
+        return 11
+    fi
+}
+
+stop() {
+    echo "Stopping Tomcat servlet container at `date`"
+    # Providing CATALINA_PID and $STOP_SECONDS, but not -force, so Tomcat 8 catalina.sh does a kill -3 thread dump on timeout.
+    ${CATALINA_HOME}/bin/shutdown.sh $STOP_SECONDS
+    SHUTDOWN_EXIT_CODE=$?
+    if [ $SHUTDOWN_EXIT_CODE -ne 0 ]; then
+      echo "Tomcat shutdown.sh exited with code $SHUTDOWN_EXIT_CODE, but app script will try, too."
+    fi
+
+    PID=`cat_pid`
+
+    if [ -z "$PID" ]; then
+        PID=`ps_tomcat $APP_USER | awk '{print $2}'`
+    fi
+
+    if [ ! -z "$PID" ]; then
+      if ps_tomcat $PID > /dev/null; then
+        echo
+        echo "Tomcat process is still running! Killing $PID..."
+        kill -9 $PID
+        sleep 2
+      else
+        echo "ok"
+      fi
+    fi
+    wait_for_ports_to_close $WAIT_PORTS
+
+    rotate stopping
+    age_logs
+
+    if [ ! -z "$PID" ] && ps_tomcat $PID; then
+      echo "Tomcat still running after kill!"
+      return 1
+    else
+      echo "Tomcat not running."
+      /bin/rm $CATALINA_PID 2> /dev/null
+      return 0
+    fi
+}
+
+
 case "$1" in
-'start' | 'stop')
-  follow && sapp $1
-  ;;
-'status')
-  sapp status
-  ;;
+'start')
+    start
+    ;;
+'stop')
+    stop
+    ;;
 *)
-  usage
-  ;;
+    echo "Usage: $0 { start | stop }" 1>&2
+    exit 12
+    ;;
 esac
-# eof: sapp
+
+# eof: app
