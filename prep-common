@@ -100,9 +100,9 @@ chgrp ${APP_GRP} ${WEBAPPS_DIR}/${DIST}
 echo
 echo "Done."
 echo "Now switch to ${APP_USER} and do the following:"
-echo "  1. Stop the application, using \"sapp stop\" (i.e., \"sudo /bin/systemctl stop tomcat_${APP_USER}\")"
+echo "  1. Stop the application, using \"app stop\" (i.e., \"sudo /bin/systemctl stop tomcat_${APP_USER}\")"
 echo "  2. Run the \"deploy\" command to redeploy the WAR file."
 echo "  3. Be sure that your app's configuration files are set properly."
-echo "  4. Start the application, using \"sapp start\" (i.e., \"sudo /bin/systemctl start tomcat_${APP_USER}\")"
+echo "  4. Start the application, using \"app start\" (i.e., \"sudo /bin/systemctl start tomcat_${APP_USER}\")"
 
 # eof: prep

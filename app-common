@@ -1,18 +1,19 @@
 #! /bin/bash
-# sapp - run systemctl on the app, while following $APP_LOG.
+# app - run systemctl on the app, while following $APP_LOG.
 #      06/20/28, jbeutel@hawaii.edu; for RHEL7 systemd
+#      08/02/28, jbeutel@hawaii.edu; renamed to app-common and made backwards compatible
 #
 # $Id$
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user
 #   2. Returns
-#        0 if successfully starts or stops Tomcat, or status is running
-#        non-0 if Tomcat fails to start or stop, or status is not running
+#        0 if successfully starts or checks that Tomcat is running
+#        non-0 if Tomcat not running (NB: successful stop returns non-0, like for SysV init)
 #---------------------------------------------------------------------
 # Install:
-#   1. Install as sapp-common in /usr/local/bin.
-#   2. Symlink from /usr/local/bin/sapp-common to sapp in APP_USER's home dir.
+#   1. Install as app-common in /usr/local/bin.
+#   2. Symlink from /usr/local/bin/app-common to app in APP_USER's home dir.
 #   3. sudoers allows APP_USER to "/bin/systemctl {start|stop|status} tomcat_${APP_USER}"
 
 # You shouldn't need to change variable settings in this script;
@@ -39,7 +40,7 @@ LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
 APP_LOG=${LOG_DIR}/app-err.log
 
 usage() {
-  echo "Usage: $0 { start | stop | status }" 1>&2
+  echo "Usage: $0 { start | stop | check | status }" 1>&2
   exit 1
 }
 
@@ -56,10 +57,13 @@ if [ $# -ne 1 ]; then
   usage
 fi
 case "$1" in
-'start' | 'stop')
-  follow && sapp $1
+'start')
+  follow && sapp start
   ;;
-'status')
+'stop')
+  follow && ! { sapp stop || ! sapp status }
+  ;;
+'check'|'status')
   sapp status
   ;;
 *)

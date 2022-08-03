@@ -13,9 +13,9 @@ Group=tomcat
 Environment="CATALINA_PID=/home/{{ user }}/tomcat/pidfile"
 PIDFile=/home/{{ user }}/tomcat/pidfile
 
-ExecStart=/home/{{ user }}/app start
+ExecStart=/home/{{ user }}/sapp start
 TimeoutStartSec=960s
-ExecStop=/home/{{ user }}/app stop
+ExecStop=/home/{{ user }}/sapp stop
 TimeoutStopSec=300s
 
 SuccessExitStatus=1

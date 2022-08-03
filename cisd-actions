@@ -13,6 +13,7 @@
 #
 # jbeutel 2014-04-04
 # jbeutel 2022-07-27 update for RHEL7
+# jbeutel 2022-08-02 switch to backwards compatible app script
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -72,19 +73,19 @@ soft-link() {
 }
 
 start() {
-    $BASE/sapp start
+    $BASE/app start
 }
 
 stop() {
-    ! status && echo "not running, so no need to stop" && return 0
+    ! check && echo "not running, so no need to stop" && return 0
     /usr/local/sbin/zm 15     # 15-minute Zabbix maintenance
     echo "Sleeping 20 seconds to let Zabbix recognize maintenance..."
     sleep 20
-    $BASE/sapp stop    # success if app has stopped
+    ! $BASE/app stop    # success if app has stopped
 }
 
-status() {
-    $BASE/sapp status
+check() {
+    $BASE/app check
 }
 
 dbdump() {
@@ -110,8 +111,8 @@ case "$1" in
 'stop')
     stop
     ;;
-'check'|'status')
-    status
+'check')
+    check
     ;;
 'deploy')
     deploy "$2"

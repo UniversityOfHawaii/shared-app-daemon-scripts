@@ -1,5 +1,5 @@
 #! /bin/bash
-# app - Run Tomcat servlet container.
+# sapp - Run Tomcat servlet container for systemd.
 #     - 10/02/08, Russell Tokuyama (UH ITS)
 #
 # $Id$
@@ -27,6 +27,7 @@
 #      06/20/22, jbeutel@hawaii.edu; port for RHEL7 systemd
 #      07/19/22, jbeutel@hawaii.edu; add check_context_startup()
 #      07/28/22, jbeutel@hawaii.edu; default to no socketStatisticsAgent.jar
+#      08/02/22, jbeutel@hawaii.edu; renamed to sapp-common, to make app-common backwards-compatible
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -35,8 +36,8 @@
 #        non-0 if Tomcat or context fails to start or stop
 #---------------------------------------------------------------------
 # Install:
-#   1. Install as app-common in /usr/local/bin.
-#   2. Symlink from /usr/local/bin/app-common to app in APP_USER's home dir.
+#   1. Install as sapp-common in /usr/local/bin.
+#   2. Symlink from /usr/local/bin/sapp-common to sapp in APP_USER's home dir.
 #   3. For convenience, add APP_USER's home dir to PATH env var.
 #---------------------------------------------------------------------
 #
@@ -61,7 +62,7 @@ GUESS_APP_USER=${DIR_WITH_THIS_SCRIPT}
 if [ $PPID -ne 1 ]; then
   echo "Do not run this app script directly, so RHEL7 systemd can manage what is running; instead," 1>&2
   echo "as the $GUESS_APP_USER user, use 'sudo /bin/systemctl {start|stop|status} tomcat_$GUESS_APP_USER'" 1>&2
-  echo "or './sapp {start|stop|status}'" 1>&2
+  echo "or better yet, './app {start|stop|check}'" 1>&2
   exit 3
 fi
 
