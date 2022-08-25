@@ -9,12 +9,13 @@ pipeline {
   stages {
       stage('SCP *-common') {
           steps {
-              sh 'echo "testing scp" > foo; scp ${SCP_OPTS} foo cisd@its95.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp ${SCP_OPTS} *-common cisd@its73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'echo "testing scp" > foo; scp ${SCP_OPTS} foo cisd@its95.pvt.hawaii.edu:/usr/local/bin/appDaemon/foo'
+              sh 'ls -l app-common; scp ${SCP_OPTS} app-common cisd@its60.pvt.hawaii.edu:/usr/local/bin/appDaemon/app-common'
               sh 'scp ${SCP_OPTS} *-common cisd@its60.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its70.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its71.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its72.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp ${SCP_OPTS} *-common cisd@its73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@sec90.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
 //              sh 'scp ${SCP_OPTS} *-common myiamd@iwa73.its.hawaii.edu:/usr/local/bin/appDaemon/'
 //              sh 'scp ${SCP_OPTS} *-common myiamd@iws73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
