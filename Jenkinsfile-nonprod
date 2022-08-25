@@ -4,7 +4,7 @@ pipeline {
     buildDiscarder(logRotator(numToKeepStr:'90'))
   }
   environment {
-    SCP_OPTS = "-vB"
+    SCP_OPTS = "-vB1"
   }
   stages {
       stage('SCP *-common') {
