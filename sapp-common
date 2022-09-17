@@ -336,7 +336,7 @@ check_context_startup() {
     TAIL_PID=$!
     WAITED=0
     BAD="^SEVERE: Context .* startup failed"
-    GOOD="^INFO: Server startup in "
+    GOOD="INFO.* Server startup in "
     while ! grep -q "${BAD}\|${GOOD}" $CATALINA && [ $START_SECONDS -eq 0 -o $WAITED -lt $START_SECONDS ]; do
         sleep 1
         WAITED=`expr $WAITED + 1`
