@@ -25,7 +25,7 @@ The following must be set up prior to installation:
 1. Users that administer the web app must be in the daemon user's group.
 1. Users in the daemon user's group must be set up with sudo access to switch user to the daemon user.
 1. The daemon user must be set up with sudo access to run `/bin/systemctl {start|stop|status} tomcat_{{ user }}`.
-1. This distribution must be unpacked in /usr/local/bin
+1. This distribution must be unpacked in /usr/local/bin/appDaemon
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ```

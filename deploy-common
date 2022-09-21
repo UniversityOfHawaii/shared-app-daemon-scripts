@@ -24,8 +24,8 @@
 #
 #---------------------------------------------------------------------
 # Install:
-#   1. Install as deploy-common in /usr/local/bin.
-#   2. Symlink from /usr/local/bin/deploy-common to deploy in APP_USER's home dir.
+#   1. Install as deploy-common in /usr/local/bin/appDaemon.
+#   2. Symlink from /usr/local/bin/appDaemon/deploy-common to deploy in APP_USER's home dir.
 #   3. For convenience, add APP_USER's home dir to PATH env var.
 
 # You shouldn't need to change variable settings in this script;

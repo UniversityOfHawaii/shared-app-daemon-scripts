@@ -36,8 +36,8 @@
 #        non-0 if Tomcat or context fails to start or stop
 #---------------------------------------------------------------------
 # Install:
-#   1. Install as sapp-common in /usr/local/bin.
-#   2. Symlink from /usr/local/bin/sapp-common to sapp in APP_USER's home dir.
+#   1. Install as sapp-common in /usr/local/bin/appDaemon.
+#   2. Symlink from /usr/local/bin/appDaemon/sapp-common to sapp in APP_USER's home dir.
 #   3. For convenience, add APP_USER's home dir to PATH env var.
 #---------------------------------------------------------------------
 #
