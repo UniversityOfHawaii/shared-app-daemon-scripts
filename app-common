@@ -46,7 +46,11 @@ usage() {
 
 follow() {
   echo "Following $APP_LOG..."
-  tail -n 0 -F --pid=$$ $APP_LOG &
+  # 2>/dev/null to hide messages like the following, which are expected, but look like errors:
+  # tail: cannot open ‘/home/tapsdevd/tomcat/logs/app-err.log’ for reading: No such file or directory
+  # tail: ‘/home/tapsdevd/tomcat/logs/app-err.log’ has appeared;  following end of new file
+  # tail: ‘/home/tapsdevd/tomcat/logs/app-err.log’ has become inaccessible: No such file or directory
+  tail -n 0 -F --pid=$$ $APP_LOG 2>/dev/null &
 }
 
 sapp() {
@@ -61,9 +65,9 @@ case "$1" in
   follow && sapp start
   ;;
 'stop')
-  follow && ! { sapp stop || ! sapp status ; }
+  follow && ! { sapp stop || ! sapp status; }
   ;;
-'check'|'status')
+'check' | 'status')
   sapp status
   ;;
 *)
