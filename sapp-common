@@ -331,9 +331,10 @@ start() {
 
 check_context_startup() {
     CATALINA=$LOG_DIR/catalina.out
-    echo -e "\nFollowing $CATALINA..."
-    tail -F $CATALINA --pid=$$ &  # to stdout and $APP_LOG, while we're waiting on it
+    echo -e "\nStarted following $CATALINA..."
+    tail -F $CATALINA --pid=$$ 2>/dev/null &  # to stdout and $APP_LOG, while we're waiting on it
     TAIL_PID=$!
+    disown %%  # to definitely avoid Terminated message when tail is killed
     WAITED=0
     BAD="^SEVERE: Context .* startup failed"
     GOOD="INFO.* Server startup in "
@@ -342,6 +343,8 @@ check_context_startup() {
         WAITED=`expr $WAITED + 1`
     done
     kill $TAIL_PID
+    wait $TAIL_PID 2>/dev/null  # probably also avoids Terminated message, and syncs on kill for clean log
+    echo "Stopped following $CATALINA"
     if grep "$BAD" $CATALINA ; then
         return 10
     elif grep -q "$GOOD" $CATALINA ; then
