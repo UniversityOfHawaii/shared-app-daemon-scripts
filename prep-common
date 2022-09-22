@@ -8,8 +8,8 @@
 # $Id$
 #
 # Mod: 
-#      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
-#      12/02/15, cahana@hawaii.edu; commented out check to ensure the user running the script is not the daemon/app user
+#      2010-03-10 jbeutel@hawaii.edu; parameterize and allow for overrides
+#      2015-12-02 cahana@hawaii.edu; commented out check to ensure the user running the script is not the daemon/app user
 #
 # Preconditions:
 #   1. The distribution should be named like ${CTX_NAME}.war (see the

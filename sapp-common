@@ -1,33 +1,35 @@
 #! /bin/bash
 # sapp - Run Tomcat servlet container for systemd.
-#     - 10/02/08, Russell Tokuyama (UH ITS)
+#     - 2008-10-02 Russell Tokuyama (UH ITS)
 #
 # $Id$
 #
-# Mod: 11/25/08, russ@hawaii.edu; Silenced error output of kill.
-#      12/10/08, jbeutel@hawaii.edu; added JMX and wait for stop before kill
-#      04/06/09, jbeutel@hawaii.edu; updated JMX config
-#      07/10/09, russ@hawaii.edu; Fixed ps_tomcat to find the JVM process
-#      09/14/09, jbeutel@hawaii.edu; use out-of-the-box JMX auth instead of single-port agent
-#      09/15/09, jbeutel@hawaii.edu; optionally specify garbage collector for load testing
-#      09/17/09, jbeutel@hawaii.edu; optional socket MBean agent for statistics only (no logging)
-#      11/04/09, jbeutel@hawaii.edu; added YourKit option & updated versions
-#      12/02/09, jbeutel@hawaii.edu; specify private network for JMX callback
-#      02/22/10, jbeutel@hawaii.edu; on stop wait for listening port to close
-#      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
-#      07/12/13, jbeutel@hawaii.edu; updated default jdk to Solaris 1.6.0_51
-#      12/02/15, cahana@hawaii.edu; merged with app script from the current RHEL servers
-#      12/04/16, jbeutel@hawaii.edu; added JMX_RMI_PORT & updated defaults
-#      04/18/16, cahana@hawaii.edu; commented out YourKit Profiler references
-#      05/21/18, cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
-#      04/29/19, duckart@hawaii.edu; Differentiate the Tomcat not started messages.
-#      07/19/19, jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
-#      02/11/21, jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
-#      02/11/21, jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
-#      06/20/22, jbeutel@hawaii.edu; port for RHEL7 systemd
-#      07/19/22, jbeutel@hawaii.edu; add check_context_startup()
-#      07/28/22, jbeutel@hawaii.edu; default to no socketStatisticsAgent.jar
-#      08/02/22, jbeutel@hawaii.edu; renamed to sapp-common, to make app-common backwards-compatible
+# Mod: 2008-11-25 russ@hawaii.edu; Silenced error output of kill.
+#      2008-12-10 jbeutel@hawaii.edu; added JMX and wait for stop before kill
+#      2009-04-06 jbeutel@hawaii.edu; updated JMX config
+#      2009-07-10 russ@hawaii.edu; Fixed ps_tomcat to find the JVM process
+#      2009-09-14 jbeutel@hawaii.edu; use out-of-the-box JMX auth instead of single-port agent
+#      2009-09-15 jbeutel@hawaii.edu; optionally specify garbage collector for load testing
+#      2009-09-17 jbeutel@hawaii.edu; optional socket MBean agent for statistics only (no logging)
+#      2009-11-04 jbeutel@hawaii.edu; added YourKit option & updated versions
+#      2009-12-02 jbeutel@hawaii.edu; specify private network for JMX callback
+#      2010-02-22 jbeutel@hawaii.edu; on stop wait for listening port to close
+#      2010-03-10 jbeutel@hawaii.edu; parameterize and allow for overrides
+#      2013-07-12 jbeutel@hawaii.edu; updated default jdk to Solaris 1.6.0_51
+#      2015-12-02 cahana@hawaii.edu; merged with app script from the current RHEL servers
+#      2016-12-04 jbeutel@hawaii.edu; added JMX_RMI_PORT & updated defaults
+#      2016-04-18 cahana@hawaii.edu; commented out YourKit Profiler references
+#      2018-05-21 cahana@hawaii.edu; removed https.protocols from JVM_SECURITY to work with CAS 5/Tomcat 8.5
+#      2019-04-29 duckart@hawaii.edu; Differentiate the Tomcat not started messages.
+#      2019-07-19 jbeutel@hawaii.edu; added netstat_port() support for macOS 10.14
+#      2021-02-11 jbeutel@hawaii.edu; stop specifying gzip path, for macOS 10.15
+#      2021-02-11 jbeutel@hawaii.edu; wait for default JMX_RMI_PORT to close
+#      2022-06-20 jbeutel@hawaii.edu; port for RHEL7 systemd
+#      2022-07-19 jbeutel@hawaii.edu; add check_context_startup()
+#      2022-07-28 jbeutel@hawaii.edu; default to no socketStatisticsAgent.jar
+#      2022-08-02 jbeutel@hawaii.edu; renamed to sapp-common, to make app-common backwards-compatible
+#      2022-09-16 jbeutel@hawaii.edu; widen GOOD server startup regexp
+#      2022-09-20 jbeutel@hawaii.edu; friendly message on kill of tail catalina.out
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).

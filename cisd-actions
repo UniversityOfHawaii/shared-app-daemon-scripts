@@ -11,9 +11,9 @@
 #
 # $Id$
 #
-# jbeutel 2014-04-04
-# jbeutel 2022-07-27 update for RHEL7
-# jbeutel 2022-08-02 switch to backwards compatible app script
+# 2014-04-04 jbeutel
+# 2022-07-27 jbeutel update for RHEL7
+# 2022-08-02 jbeutel switch to backwards compatible app script
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.

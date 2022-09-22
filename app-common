@@ -1,7 +1,8 @@
 #! /bin/bash
 # app - run systemctl on the app, while following $APP_LOG.
-#      06/20/28, jbeutel@hawaii.edu; for RHEL7 systemd
-#      08/02/28, jbeutel@hawaii.edu; renamed to app-common and made backwards compatible
+#      2022-06-20 jbeutel@hawaii.edu; for RHEL7 systemd
+#      2022-08-02 jbeutel@hawaii.edu; renamed to app-common and made backwards compatible
+#      2022-09-20 jbeutel@hawaii.edu; hide tail stderr
 #
 # $Id$
 #---------------------------------------------------------------------

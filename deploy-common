@@ -1,14 +1,13 @@
 #! /bin/sh
 # deploy - Removes the old directory that the app's WAR file was expanded in
 #          to make sure that the new WAR file is deployed.
-#        - 01/13/04, Russell Tokuyama
+#        - 2004-01-13 Russell Tokuyama
 #
 # $Id$
 #
-# Mod: 04/18/06, russ@hawaii.edu; Added removal of old context config and work
-#                files.
-#      07/29/08, russ@hawaii.edu; Replaced whoami with id.
-#      03/10/10, jbeutel@hawaii.edu; parameterize and allow for overrides
+# Mod: 2006-04-18 russ@hawaii.edu; Added removal of old context config and work files.
+#      2008-07-29 russ@hawaii.edu; Replaced whoami with id.
+#      2010-03-10 jbeutel@hawaii.edu; parameterize and allow for overrides
 #
 # Preconditions:
 #   1. The distribution should be named like ${CTX_NAME}.war (see the
