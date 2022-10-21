@@ -31,6 +31,7 @@
 #      2022-09-16 jbeutel@hawaii.edu; widen GOOD server startup regexp
 #      2022-09-20 jbeutel@hawaii.edu; friendly message on kill of tail catalina.out
 #      2022-10-20 jbeutel@hawaii.edu; widen BAD server startup regexp
+#      2022-10-20 jbeutel@hawaii.edu; validate pidfile
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -69,9 +70,10 @@ if [ $PPID -ne 1 ]; then
   exit 3
 fi
 
-# Require CATALINA_PID be defined in tomcat_$GUESS_APP_USER.service, not in $PARAM_FILE, to correspond with PIDFile to systemd.
+# Require CATALINA_PID be defined in tomcat_$GUESS_APP_USER.service, not in $PARAM_FILE (which is loaded next).
+SERVICE_FILE="/etc/systemd/system/tomcat_${GUESS_APP_USER}.service"
 if [ -z "${CATALINA_PID:-}" ]; then
-  echo "CATALINA_PID Environment and PIDFile should be set in tomcat_${GUESS_APP_USER}.service file in /etc/systemd/system/" 1>&2
+  echo "CATALINA_PID Environment and PIDFile should be set in ${SERVICE_FILE}" 1>&2
   exit 4
 fi
 SAVED_CATALINA_PID=${CATALINA_PID}
@@ -117,6 +119,20 @@ APP_LOG=${LOG_DIR}/app-err.log
 
 # Log this script's stdout and stderr to $APP_LOG, as well as outputting to systemd for its logging.
 exec &> >(tee -a "$APP_LOG")
+
+# Validate CATALINA_PID and PIDFile in ${SERVICE_FILE}, to avoid starting with bad ones (which gets messy).
+if [ $(dirname "${CATALINA_PID}") != "${CATALINA_BASE}" ]; then
+  echo "CATALINA_PID is ${CATALINA_PID} but should be in ${CATALINA_BASE}" 1>&2
+  exit 4
+fi
+if ! grep -q "^Environment=\"CATALINA_PID=${CATALINA_PID}\"" $SERVICE_FILE; then
+  echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
+  exit 4
+fi
+if ! grep -q "^PIDFile=${CATALINA_PID}" $SERVICE_FILE; then
+  echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
+  exit 4
+fi
 
 #  Remove log files older than these many days; override in PARAM_FILE
 OLD_AGE=${OLD_AGE:-30}
