@@ -10,9 +10,9 @@ pipeline {
           steps {
               sh 'scp *-common cisd@its30.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp *-common cisd@its31.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its32.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@its33.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp *-common cisd@sec10.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp -v -o StrictHostKeyChecking=no *-common cisd@its32.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp -v -o StrictHostKeyChecking=no *-common cisd@its33.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp -v -o StrictHostKeyChecking=no *-common cisd@sec10.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
 //              sh 'scp *-common myiamd@iws03.its.hawaii.edu:/usr/local/bin/appDaemon/'
 //              sh 'scp *-common myiamd@iwa03.its.hawaii.edu:/usr/local/bin/appDaemon/'
 //              sh 'scp *-common myiamd@iwa01.its.hawaii.edu:/usr/local/bin/appDaemon/'
