@@ -32,6 +32,7 @@
 #      2022-09-20 jbeutel@hawaii.edu; friendly message on kill of tail catalina.out
 #      2022-10-20 jbeutel@hawaii.edu; widen BAD server startup regexp
 #      2022-10-20 jbeutel@hawaii.edu; validate pidfile
+#      2022-10-27 jbeutel@hawaii.edu; stricter ps_tomcat matches
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -225,7 +226,7 @@ cat_pid() {
 }
 
 ps_tomcat() {
-    ps -ef | grep $1 | grep java | grep util.logging
+    ps -ef | grep -w $1 | grep java | grep util.logging
 }
 
 netstat_port() {
@@ -387,7 +388,7 @@ stop() {
     PID=`cat_pid`
 
     if [ -z "$PID" ]; then
-        PID=`ps_tomcat $APP_USER | awk '{print $2}'`
+        PID=`ps_tomcat ^$APP_USER | awk '{print $2}'`
     fi
 
     if [ ! -z "$PID" ]; then
