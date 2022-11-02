@@ -33,6 +33,7 @@
 #      2022-10-20 jbeutel@hawaii.edu; widen BAD server startup regexp
 #      2022-10-20 jbeutel@hawaii.edu; validate pidfile
 #      2022-10-27 jbeutel@hawaii.edu; stricter ps_tomcat matches
+#      2022-11-01 jbeutel@hawaii.edu; age_logs() also works when $LOG_DIR is a symbolic link
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -300,12 +301,13 @@ rotate() {
 
 
 age_logs() {
-    echo "Aging off log files older than [$OLD_AGE] in [$LOG_DIR]..."
+    echo "Aging off log files older than [$OLD_AGE] days in [$LOG_DIR]..."
 
-    # Find directories in the current directory older than $OLD_AGE
+    # Find directories in $LOG_DIR older than $OLD_AGE days
     # and remove them, their contents, and say their name.
+    # If $LOG_DIR is a symbolic link, then follow it.
     #
-    find $LOG_DIR -maxdepth 1 -type d -mtime +${OLD_AGE} -print -exec rm -rf {} \;
+    find -H $LOG_DIR -maxdepth 1 -type d -mtime +${OLD_AGE} -print -exec rm -rf {} \;
 }
 
 start() {
