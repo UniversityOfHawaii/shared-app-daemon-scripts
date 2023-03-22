@@ -56,12 +56,12 @@ set -u  # treat expansion of unset variables (without a default) as an error
 
 # Allow use only by systemd, so it always knows if this app is running.
 if [[ $(ps -p 1 -o comm | tail -1) != "systemd" ]]; then
-  echo "This app script is intended for running on a systemd platform such as RHEL7." 1>&2
+  stdbuf -eL echo "This app script is intended for running on a systemd platform such as RHEL7." 1>&2
   exit 64 # EX_USAGE Command line usage error
 fi
 if [ $PPID -ne 1 ]; then
-  echo "Do not run this sapp script directly, so RHEL7/8 systemd can manage what is running;" 1>&2
-  echo "instead, as the daemon user, use 'app {start|stop|check}'" 1>&2
+  stdbuf -eL echo "Do not run this sapp script directly, so RHEL7/8 systemd can manage what is running;" 1>&2
+  stdbuf -eL echo "instead, as the daemon user, use 'app {start|stop|check}'" 1>&2
   exit 77 # EX_NOPERM Permission denied
 fi
 
@@ -69,7 +69,7 @@ fi
 APP_USER=$(whoami)
 SERVICE_FILE="/etc/systemd/system/tomcat_${APP_USER}.service"
 if [ -z "${CATALINA_PID:-}" ]; then
-  echo "CATALINA_PID Environment and PIDFile should be set in ${SERVICE_FILE}" 1>&2
+  stdbuf -eL echo "CATALINA_PID Environment and PIDFile should be set in ${SERVICE_FILE}" 1>&2
   exit 78 # EX_CONFIG Configuration error
 fi
 SAVED_CATALINA_PID=${CATALINA_PID}
@@ -78,7 +78,7 @@ SAVED_CATALINA_PID=${CATALINA_PID}
 APP_HOME=${HOME?:}
 PARAM_FILE=$APP_HOME/app.parameters
 if [ ! -f $PARAM_FILE ]; then
-  echo "$PARAM_FILE not found.  (Be sure that systemd runs $0 with User= the daemon user.)" 1>&2
+  stdbuf -eL echo "$PARAM_FILE not found.  (Be sure that systemd runs $0 with User= the daemon user.)" 1>&2
   exit 72 # EX_OSFILE Critical OS file missing
 fi
 . $PARAM_FILE
@@ -117,16 +117,17 @@ APP_LOG=${LOG_DIR}/app-err.log
 exec &> >(tee -a "$APP_LOG")
 
 # Validate CATALINA_PID and PIDFile in ${SERVICE_FILE}, to avoid starting with bad ones (which gets messy).
-#if [ $(dirname "${CATALINA_PID}") != "${CATALINA_BASE}" ]; then
-#  echo "CATALINA_PID is ${CATALINA_PID} but should be in ${CATALINA_BASE}" 1>&2
-#  exit 78 # EX_CONFIG Configuration error
-#fi
-if ! grep -q "^Environment=\"CATALINA_PID=${CATALINA_PID}\"" $SERVICE_FILE; then
-  echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
+EXPECTED_PIDFILE="/run/${APP_USER}/pidfile"
+if [ "${CATALINA_PID}" != "${EXPECTED_PIDFILE}" ]; then
+  stdbuf -eL echo "CATALINA_PID is ${CATALINA_PID} but should be ${EXPECTED_PIDFILE}" 1>&2
   exit 78 # EX_CONFIG Configuration error
 fi
-if ! grep -q "^PIDFile=${CATALINA_PID}" $SERVICE_FILE; then
-  echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
+if ! grep -q "^Environment=\"CATALINA_PID=${EXPECTED_PIDFILE}\"$" $SERVICE_FILE; then
+  stdbuf -eL echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
+  exit 78 # EX_CONFIG Configuration error
+fi
+if ! grep -q "^PIDFile=${EXPECTED_PIDFILE}$" $SERVICE_FILE; then
+  stdbuf -eL echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
   exit 78 # EX_CONFIG Configuration error
 fi
 
@@ -147,13 +148,13 @@ fi
 
 # Prevent hidden, confusing overrides of the environment that is configured by this app script.
 if [ -f ${CATALINA_BASE}/bin/setenv.sh ]; then
-  echo "Remove (or move) ${CATALINA_BASE}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
-  echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
+  stdbuf -eL echo "Remove (or move) ${CATALINA_BASE}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
+  stdbuf -eL echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
   exit 78 # EX_CONFIG Configuration error
 fi
 if [ -f ${CATALINA_HOME}/bin/setenv.sh ]; then
-  echo "Remove (or move) ${CATALINA_HOME}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
-  echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
+  stdbuf -eL echo "Remove (or move) ${CATALINA_HOME}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
+  stdbuf -eL echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
   exit 78 # EX_CONFIG Configuration error
 fi
 
@@ -414,7 +415,7 @@ case "$1" in
     stop
     ;;
 *)
-    echo "Usage: $0 { start | stop }" 1>&2
+    stdbuf -eL echo "Usage: $0 { start | stop }" 1>&2
     exit 64 # EX_USAGE Command line usage error
     ;;
 esac

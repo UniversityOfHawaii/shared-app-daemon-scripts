@@ -24,7 +24,7 @@ The following must be set up prior to installation:
    and edits it to change `{{ user }}` to the daemon username, e.g., casl2d.
 1. Users that administer the web app must be in the daemon user's group.
 1. Users in the daemon user's group must be set up with sudo access to switch user to the daemon user.
-1. The daemon user must be set up with sudo access to run `/bin/systemctl {start|stop|status} tomcat_{{ user }}`.
+1. The daemon user must be set up with sudo access to run `/bin/systemctl {start|stop|show|--no-pager --lines=30 status} tomcat_{{ user }}`.
 1. This distribution must be unpacked in /usr/local/bin/appDaemon
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -43,12 +43,10 @@ total 198
 INSTALLATION
 
 1. Switch to the daemon user.  (e.g., osu casl2d)
-1. In the daemon user's home directory, create symbolic links to the shared version.  For example, with bash:
+1. In the daemon user's home directory, optionally create a symbolic link to the shared app script,
+   by convention, for overriding if necessary.
     ```
-    $ for i in app sapp deploy prep
-    do
-      ln -s /usr/local/bin/appDaemon/$i-common $i
-    done
+    $ ln -s /usr/local/bin/appDaemon/app-common app
     ```
 1. Copy the following files to the daemon user's home directory:
     ```
@@ -59,7 +57,6 @@ INSTALLATION
 1. Edit the jmxremote.password file and set the password.
 1. Edit the app.parameters file and set these:
     ```
-     APP_USER
      APP_GRP
      CTX_NAME
      JMX_PORT

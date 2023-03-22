@@ -12,14 +12,14 @@
 #   2. For { start | stop | check | status }, returns
 #        0 if successfully starts or checks that Tomcat is running
 #        non-0 if Tomcat not running (NB: successful stop returns non-0, like for SysV init)
-#   3. For { prep | stop0 | stopped | deploy | provision | show }, returns
+#   3. For { prep | stop0 | stopped | show | deploy | provision }, returns
 #        0 if successful/true (NB: stop0 return 0 if Tomcat is not running, unlike for SysV init)
 #        non-0 if failed/false
 #---------------------------------------------------------------------
 # Install:
 #   1. Install as app-common in /usr/local/bin/appDaemon.
 #   2. Optional symlink from /usr/local/bin/appDaemon/app-common to app in daemon user's home dir.
-#   3. sudoers allows daemon user to "/bin/systemctl {start|stop|status|show} tomcat_${daemon user}"
+#   3. sudoers allows daemon user to "/bin/systemctl {start|stop|show|--no-pager --lines=30 status} tomcat_${daemon user}"
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -64,12 +64,12 @@ follow() {
 }
 
 sapp() {
-  sudo /bin/systemctl $1 tomcat_${APP_USER}
+  sudo /bin/systemctl $* tomcat_${APP_USER}
 }
 
 # returns 0 (success) if the app is not running, 150 if it is running, or other non-0 for error.
 stopped() {
-  sapp status   # also outputs status messages
+  status   # also outputs status messages
   EXIT_CODE=$?
   # Unfortunately, the 'systemctl status' exit codes are not well defined, but this is based on 'man systemd.exec'
   # and its reference to https://refspecs.linuxbase.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/iniscrptact.html
@@ -153,8 +153,12 @@ restart() {
   follow && (stopped || stop0) && sapp start
 }
 
+status() {
+  sapp --no-pager --lines=30 status
+}
+
 usage() {
-  echo "Usage: $0 { prep | start | stop | stop0 | stopped | restart | check | status | deploy | provision | show }" 1>&2
+  echo "Usage: $0 { prep | start | stop | stop0 | stopped | restart | check | status | show | deploy | provision }" 1>&2
   exit 64 # EX_USAGE Command line usage error
 }
 
@@ -171,13 +175,13 @@ case "$1" in
 'stop0')
   follow && stop0
   ;;
-'check')
-  sapp status
-  ;;
-'status' | 'show')
+'show')
   sapp $1
   ;;
-'stopped' | 'restart' | 'prep' | 'deploy' | 'provision')
+'check')
+  status
+  ;;
+'status' | 'stopped' | 'restart' | 'prep' | 'deploy' | 'provision')
   $1
   ;;
 *)
