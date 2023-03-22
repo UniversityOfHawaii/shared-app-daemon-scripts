@@ -1,6 +1,6 @@
 # shared-app-daemon-scripts
 
-This project contains scripts used for Enterprise Systems Software Engineering RHEL7 VMs. They are installed Commands to start and stop an app server instance and to deploy a new war file for the web app.
+This project contains scripts used for Enterprise Systems Software Engineering RHEL8 VMs. They are installed Commands to start and stop an app server instance and to deploy a new war file for the web app.
 
 PREREQUISITES
 
@@ -24,7 +24,7 @@ The following must be set up prior to installation:
    and edits it to change `{{ user }}` to the daemon username, e.g., casl2d.
 1. Users that administer the web app must be in the daemon user's group.
 1. Users in the daemon user's group must be set up with sudo access to switch user to the daemon user.
-1. The daemon user must be set up with sudo access to run `/bin/systemctl {start|stop|show|--no-pager --lines=30 status} tomcat_{{ user }}`.
+1. The daemon user must be set up with sudo access to run `/bin/systemctl {start|stop|show|--no-pager --lines=[0-9][0-9] status} tomcat_{{ user }}`.
 1. This distribution must be unpacked in /usr/local/bin/appDaemon
 
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

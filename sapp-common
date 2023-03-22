@@ -75,7 +75,7 @@ fi
 SAVED_CATALINA_PID=${CATALINA_PID}
 
 # include parameters from the daemon user's home dir
-APP_HOME=${HOME?:}
+APP_HOME=${HOME:?}
 PARAM_FILE=$APP_HOME/app.parameters
 if [ ! -f $PARAM_FILE ]; then
   stdbuf -eL echo "$PARAM_FILE not found.  (Be sure that systemd runs $0 with User= the daemon user.)" 1>&2
@@ -86,7 +86,7 @@ CATALINA_PID=${SAVED_CATALINA_PID}  # preventing any override attempt by $PARAM_
 
 # avoid these being overridden by old app.parameters
 APP_USER=$(whoami)
-APP_HOME=${HOME}
+APP_HOME=${HOME:?}
 
 # default wait for graceful Tomcat shutdown
 STOP_SECONDS=${STOP_SECONDS:-30}

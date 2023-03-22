@@ -1,0 +1,24 @@
+# sample full file for /etc/sudoers.d/75_tomcat_{{ name }}
+Defaults:{{ name }}  !requiretty
+Cmnd_Alias TOMCAT_{{ NAME }}_CMDS = \
+/bin/systemctl start tomcat_{{ name }}, \
+/bin/systemctl start tomcat_{{ name }}.service, \
+/usr/bin/systemctl start tomcat_{{ name }}, \
+/usr/bin/systemctl start tomcat_{{ name }}.service, \
+/bin/systemctl --no-pager --lines=[0-9][0-9] status tomcat_{{ name }}, \
+/bin/systemctl --no-pager --lines=[0-9][0-9] status tomcat_{{ name }}.service, \
+/usr/bin/systemctl --no-pager --lines=[0-9][0-9] status tomcat_{{ name }}, \
+/usr/bin/systemctl --no-pager --lines=[0-9][0-9] status tomcat_{{ name }}.service, \
+/bin/systemctl stop tomcat_{{ name }}, \
+/bin/systemctl stop tomcat_{{ name }}.service, \
+/usr/bin/systemctl stop tomcat_{{ name }}, \
+/usr/bin/systemctl stop tomcat_{{ name }}.service, \
+/bin/systemctl is-active tomcat_{{ name }}, \
+/bin/systemctl is-active tomcat_{{ name }}.service, \
+/usr/bin/systemctl is-active tomcat_{{ name }}, \
+/usr/bin/systemctl is-active tomcat_{{ name }}.service, \
+/bin/systemctl show tomcat_{{ name }}, \
+/bin/systemctl show tomcat_{{ name }}.service, \
+/usr/bin/systemctl show tomcat_{{ name }}, \
+/usr/bin/systemctl show tomcat_{{ name }}.service
+%tomcat ALL=(root) NOPASSWD:TOMCAT_{{ NAME }}_CMDS

@@ -19,7 +19,7 @@
 # Install:
 #   1. Install as app-common in /usr/local/bin/appDaemon.
 #   2. Optional symlink from /usr/local/bin/appDaemon/app-common to app in daemon user's home dir.
-#   3. sudoers allows daemon user to "/bin/systemctl {start|stop|show|--no-pager --lines=30 status} tomcat_${daemon user}"
+#   3. sudoers allows daemon user to "/bin/systemctl {start|stop|show|--no-pager --lines=[0-9][0-9] status} tomcat_${daemon user}"
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -27,7 +27,7 @@
 set -u # treat expansion of unset variables (without a default) as an error
 
 # include parameters from the daemon user's home dir
-APP_HOME=${HOME}
+APP_HOME=${HOME:?}
 PARAM_FILE=$APP_HOME/app.parameters
 if [ ! -f $PARAM_FILE ]; then
   echo "$PARAM_FILE not found.  (Be sure to run $0 as the daemon user.)" 1>&2
@@ -41,12 +41,13 @@ CTX_NAME=${CTX_NAME:?}
 
 # avoid these being overridden by old app.parameters
 APP_USER=$(whoami)
-APP_HOME=${HOME}
+APP_HOME=${HOME:?}
 
 # defaults
 CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
 WEBAPPS_DIR=${WEBAPPS_DIR:-${CATALINA_BASE}/webapps}
 LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
+STATUS_LINES=${STATUS_LINES:-15}
 
 # Binary distribution must be named like so:
 DIST=${DIST:-${CTX_NAME}.war}
@@ -154,7 +155,7 @@ restart() {
 }
 
 status() {
-  sapp --no-pager --lines=30 status
+  sapp --no-pager --lines=${STATUS_LINES} status
 }
 
 usage() {
