@@ -3,47 +3,56 @@
 #      2022-06-20 jbeutel@hawaii.edu; for RHEL7 systemd
 #      2022-08-02 jbeutel@hawaii.edu; renamed to app-common and made backwards compatible
 #      2022-09-20 jbeutel@hawaii.edu; hide tail stderr
+#      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
 #
 # $Id$
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run as the daemon user
-#   2. Returns
+#   2. For { start | stop | check | status }, returns
 #        0 if successfully starts or checks that Tomcat is running
 #        non-0 if Tomcat not running (NB: successful stop returns non-0, like for SysV init)
+#   3. For { prep | stop0 | stopped | deploy | provision | show }, returns
+#        0 if successful/true (NB: stop0 return 0 if Tomcat is not running, unlike for SysV init)
+#        non-0 if failed/false
 #---------------------------------------------------------------------
 # Install:
 #   1. Install as app-common in /usr/local/bin/appDaemon.
-#   2. Symlink from /usr/local/bin/appDaemon/app-common to app in APP_USER's home dir.
-#   3. sudoers allows APP_USER to "/bin/systemctl {start|stop|status} tomcat_${APP_USER}"
+#   2. Optional symlink from /usr/local/bin/appDaemon/app-common to app in daemon user's home dir.
+#   3. sudoers allows daemon user to "/bin/systemctl {start|stop|status|show} tomcat_${daemon user}"
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
 
 set -u # treat expansion of unset variables (without a default) as an error
 
-# include parameters from same dir as this script
-PARAM_FILE=$(dirname $0)/app.parameters
+# include parameters from the daemon user's home dir
+APP_HOME=${HOME}
+PARAM_FILE=$APP_HOME/app.parameters
 if [ ! -f $PARAM_FILE ]; then
-  echo "$PARAM_FILE not found" 1>&2
-  exit 5
+  echo "$PARAM_FILE not found.  (Be sure to run $0 as the daemon user.)" 1>&2
+  exit 72 # EX_OSFILE Critical OS file missing
 fi
 . $PARAM_FILE
 
-# make sure we got the required parameter
-APP_USER=${APP_USER:?}
+# make sure we got the required parameters
+APP_GRP=${APP_GRP:?}
+CTX_NAME=${CTX_NAME:?}
+
+# avoid these being overridden by old app.parameters
+APP_USER=$(whoami)
+APP_HOME=${HOME}
 
 # defaults
-APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
 CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
+WEBAPPS_DIR=${WEBAPPS_DIR:-${CATALINA_BASE}/webapps}
 LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
 
-APP_LOG=${LOG_DIR}/app-err.log
+# Binary distribution must be named like so:
+DIST=${DIST:-${CTX_NAME}.war}
 
-usage() {
-  echo "Usage: $0 { start | stop | check | status }" 1>&2
-  exit 1
-}
+# The APP_LOG file name might be constrained by the sapp script, so don't allow it to be overridden.
+APP_LOG=${LOG_DIR}/app-err.log
 
 follow() {
   echo "Following $APP_LOG..."
@@ -58,6 +67,97 @@ sapp() {
   sudo /bin/systemctl $1 tomcat_${APP_USER}
 }
 
+# returns 0 (success) if the app is not running, 150 if it is running, or other non-0 for error.
+stopped() {
+  sapp status   # also outputs status messages
+  EXIT_CODE=$?
+  # Unfortunately, the 'systemctl status' exit codes are not well defined, but this is based on 'man systemd.exec'
+  # and its reference to https://refspecs.linuxbase.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/iniscrptact.html
+  case $EXIT_CODE in
+    0) return 150 ;;  # program is running (150..199 reserved for application use)
+    1) return 0 ;;  # program is dead and /var/run pid file exists
+    2) return 0 ;;  # program is dead and /var/lock lock file exists
+    3) return 0 ;;  # program is not running (normal success for stopped)
+    4) return $EXIT_CODE ;; # program or service status is unknown
+    *) return $EXIT_CODE ;; # other errors (might also be stopped, but not sure)
+  esac
+}
+
+# stop app and return 0 (success) if app is successfully stopped, or anyway stopped
+stop0() {
+  sapp stop || stopped
+}
+
+# prep - Move a binary distribution file to the application daemon
+#        user's webapps directory and set the group ownership
+#        and file permissions of the file so that the application daemon
+#        user can manipulate the file.
+prep() {
+  if [ ! -f ${DIST} ] ; then
+    echo "${DIST} not found"
+    return 66 # EX_NOINPUT Cannot open input
+  fi
+
+  if [ ! -d ${WEBAPPS_DIR} ] ; then
+    echo "${WEBAPPS_DIR} not found"
+    return 72 # EX_OSFILE Critical OS file missing
+  fi
+
+  # Move file to application daemon user's servlet directory.
+  # (This preserves the original owner of the file, but now it's normally the daemon user, anyway.)
+  echo "Moving ${DIST} to ${WEBAPPS_DIR} ..."
+  DT=`date '+%y%m%d-%H%M'`
+  # Only keep one previous war file.
+  /bin/rm -f ${WEBAPPS_DIR}/${DIST}-* || return $?
+  /bin/mv ${WEBAPPS_DIR}/${DIST} ${WEBAPPS_DIR}/${DIST}-${DT} || return $?
+  /bin/cp ./${DIST} ${WEBAPPS_DIR} || return $?
+
+  echo "Setting file access on ${DIST}..."
+  chmod 660 ${WEBAPPS_DIR}/${DIST} || return $?
+
+  echo "Setting group ownership of ${DIST}..."
+  chgrp ${APP_GRP} ${WEBAPPS_DIR}/${DIST} || return $?
+  echo
+  echo "Done preparing ${DIST}."
+  echo "Now you can 'app stop', 'app deploy', ensure config files are correct, & 'app start'."
+}
+
+# deploy - Removes the old directory that the app's WAR file was expanded in
+#          to make sure that the new WAR file is deployed.
+deploy() {
+  WEBCONF_DIR=${WEBCONF_DIR:-${CATALINA_BASE}/conf/Catalina}
+  WORK_DIR=${WORK_DIR:-${CATALINA_BASE}/work}
+
+  if [ ! -f ${WEBAPPS_DIR}/${DIST} ] ; then
+    echo "${DIST} not found.  Please upload it and run 'app prep' before 'app deploy'."
+    return 78 # EX_CONFIG Configuration error
+  fi
+
+  # remove expanded app directory
+  echo "Removing expanded app directory, ${CTX_NAME}, from ${WEBAPPS_DIR}..."
+  /bin/rm -rf  ${WEBAPPS_DIR}/${CTX_NAME} || return $?
+  echo "Removing context config file, ${CTX_NAME}.xml, from under ${WEBCONF_DIR}..."
+  /bin/rm -f  ${WEBCONF_DIR}/*/${CTX_NAME}.xml || return $?
+  echo "Removing old work files from ${WORK_DIR}..."
+  /bin/rm -rf  ${WORK_DIR}/* || return $?
+
+  echo
+  echo "Application deployed.  Now you can 'app start' it."
+}
+
+provision() {
+  follow && prep && (stopped || stop0) && deploy && sapp start
+}
+
+restart() {
+  follow && (stopped || stop0) && sapp start
+}
+
+usage() {
+  echo "Usage: $0 { prep | start | stop | stop0 | stopped | restart | check | status | deploy | provision | show }" 1>&2
+  exit 64 # EX_USAGE Command line usage error
+}
+
 if [ $# -ne 1 ]; then
   usage
 fi
@@ -66,10 +166,19 @@ case "$1" in
   follow && sapp start
   ;;
 'stop')
-  follow && ! { sapp stop || ! sapp status; }
+  follow && ! stop0
   ;;
-'check' | 'status')
+'stop0')
+  follow && stop0
+  ;;
+'check')
   sapp status
+  ;;
+'status' | 'show')
+  sapp $1
+  ;;
+'stopped' | 'restart' | 'prep' | 'deploy' | 'provision')
+  $1
   ;;
 *)
   usage

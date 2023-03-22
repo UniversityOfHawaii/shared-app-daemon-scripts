@@ -1,7 +1,7 @@
-# shared-app-daemon-scripts for RHEL7 /etc/systemd/system/tomcat_{{ user }}.service
+# shared-app-daemon-scripts for RHEL8 /etc/systemd/system/tomcat_{{ user }}.service
 
 [Unit]
-Description=Apache Tomcat Application Server
+Description=Apache Tomcat Application Server for {{ user }}
 After=syslog.target network.target
 
 [Service]
@@ -10,12 +10,14 @@ Type=forking
 User={{ user }}
 Group=tomcat
 
-Environment="CATALINA_PID=/home/{{ user }}/tomcat/pidfile"
-PIDFile=/home/{{ user }}/tomcat/pidfile
+RuntimeDirectory={{ user }}
+Environment="CATALINA_PID=/run/{{ user }}/pidfile"
+PIDFile=/run/{{ user }}/pidfile
 
-ExecStart=/home/{{ user }}/sapp start
+WorkingDirectory=/home/{{ user }}
+ExecStart=/usr/local/bin/appDaemon/sapp-common start
 TimeoutStartSec=960s
-ExecStop=/home/{{ user }}/sapp stop
+ExecStop=/usr/local/bin/appDaemon/sapp-common stop
 TimeoutStopSec=300s
 
 SuccessExitStatus=1

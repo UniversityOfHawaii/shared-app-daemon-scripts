@@ -34,6 +34,7 @@
 #      2022-10-20 jbeutel@hawaii.edu; validate pidfile
 #      2022-10-27 jbeutel@hawaii.edu; stricter ps_tomcat matches
 #      2022-11-01 jbeutel@hawaii.edu; age_logs() also works when $LOG_DIR is a symbolic link
+#      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -56,41 +57,36 @@ set -u  # treat expansion of unset variables (without a default) as an error
 # Allow use only by systemd, so it always knows if this app is running.
 if [[ $(ps -p 1 -o comm | tail -1) != "systemd" ]]; then
   echo "This app script is intended for running on a systemd platform such as RHEL7." 1>&2
-  exit 2
+  exit 64 # EX_USAGE Command line usage error
 fi
-DIR_WITH_THIS_SCRIPT=$(basename $(dirname $0))
-case "$DIR_WITH_THIS_SCRIPT" in
-'.') DIR_WITH_THIS_SCRIPT=$(basename $(pwd)) ;;
-'..') DIR_WITH_THIS_SCRIPT=$(basename $(dirname $(pwd))) ;;
-*) ;;
-esac
-GUESS_APP_USER=${DIR_WITH_THIS_SCRIPT}
 if [ $PPID -ne 1 ]; then
-  echo "Do not run this app script directly, so RHEL7 systemd can manage what is running; instead," 1>&2
-  echo "as the $GUESS_APP_USER user, use 'sudo /bin/systemctl {start|stop|status} tomcat_$GUESS_APP_USER'" 1>&2
-  echo "or better yet, './app {start|stop|check}'" 1>&2
-  exit 3
+  echo "Do not run this sapp script directly, so RHEL7/8 systemd can manage what is running;" 1>&2
+  echo "instead, as the daemon user, use 'app {start|stop|check}'" 1>&2
+  exit 77 # EX_NOPERM Permission denied
 fi
 
-# Require CATALINA_PID be defined in tomcat_$GUESS_APP_USER.service, not in $PARAM_FILE (which is loaded next).
-SERVICE_FILE="/etc/systemd/system/tomcat_${GUESS_APP_USER}.service"
+# Require CATALINA_PID be defined in tomcat_$APP_USER.service, not in $PARAM_FILE (which is loaded next).
+APP_USER=$(whoami)
+SERVICE_FILE="/etc/systemd/system/tomcat_${APP_USER}.service"
 if [ -z "${CATALINA_PID:-}" ]; then
   echo "CATALINA_PID Environment and PIDFile should be set in ${SERVICE_FILE}" 1>&2
-  exit 4
+  exit 78 # EX_CONFIG Configuration error
 fi
 SAVED_CATALINA_PID=${CATALINA_PID}
 
-# include parameters from same dir as this script
-PARAM_FILE=`dirname $0`/app.parameters
+# include parameters from the daemon user's home dir
+APP_HOME=${HOME?:}
+PARAM_FILE=$APP_HOME/app.parameters
 if [ ! -f $PARAM_FILE ]; then
-  echo "$PARAM_FILE not found" 1>&2
-  exit 5
+  echo "$PARAM_FILE not found.  (Be sure that systemd runs $0 with User= the daemon user.)" 1>&2
+  exit 72 # EX_OSFILE Critical OS file missing
 fi
 . $PARAM_FILE
 CATALINA_PID=${SAVED_CATALINA_PID}  # preventing any override attempt by $PARAM_FILE
 
-# make sure we got the required parameter
-APP_USER=${APP_USER:?}
+# avoid these being overridden by old app.parameters
+APP_USER=$(whoami)
+APP_HOME=${HOME}
 
 # default wait for graceful Tomcat shutdown
 STOP_SECONDS=${STOP_SECONDS:-30}
@@ -106,34 +102,32 @@ WAIT_PORTS_SECONDS=${WAIT_PORTS_SECONDS:-240}
 # default wait for context to look good after starting Tomcat, less than TimeoutStartSec in tomcat_${APP_USER}.service
 START_SECONDS=${START_SECONDS:-900}
 
-# default
-APP_HOME=${APP_HOME:-/home/${APP_USER}} # on Linux
-
 # default where Java and Tomcat are
 JAVA_HOME=${OVERRIDE_JAVA_HOME:-/usr/java/latest}
 CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
 CATALINA_HOME=${CATALINA_HOME:-/usr/local/pkg/tomcat}
 export JAVA_HOME CATALINA_BASE CATALINA_HOME
 
-# default log locations
+# default log location
 LOG_DIR=${LOG_DIR:-${CATALINA_BASE}/logs}
+# The APP_LOG file name might be constrained by this script, so don't allow it to be overridden.
 APP_LOG=${LOG_DIR}/app-err.log
 
 # Log this script's stdout and stderr to $APP_LOG, as well as outputting to systemd for its logging.
 exec &> >(tee -a "$APP_LOG")
 
 # Validate CATALINA_PID and PIDFile in ${SERVICE_FILE}, to avoid starting with bad ones (which gets messy).
-if [ $(dirname "${CATALINA_PID}") != "${CATALINA_BASE}" ]; then
-  echo "CATALINA_PID is ${CATALINA_PID} but should be in ${CATALINA_BASE}" 1>&2
-  exit 4
-fi
+#if [ $(dirname "${CATALINA_PID}") != "${CATALINA_BASE}" ]; then
+#  echo "CATALINA_PID is ${CATALINA_PID} but should be in ${CATALINA_BASE}" 1>&2
+#  exit 78 # EX_CONFIG Configuration error
+#fi
 if ! grep -q "^Environment=\"CATALINA_PID=${CATALINA_PID}\"" $SERVICE_FILE; then
   echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
-  exit 4
+  exit 78 # EX_CONFIG Configuration error
 fi
 if ! grep -q "^PIDFile=${CATALINA_PID}" $SERVICE_FILE; then
   echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
-  exit 4
+  exit 78 # EX_CONFIG Configuration error
 fi
 
 #  Remove log files older than these many days; override in PARAM_FILE
@@ -151,23 +145,16 @@ if [ -f $JMX_PASSWORD_FILE ]; then
   chmod 0400 $JMX_PASSWORD_FILE
 fi
 
-CURR_USER=`id | sed 's/[^(]*(\([^)]*\)).*$/\1/'`
-
-if [ ${CURR_USER} != ${APP_USER} ]; then
-  echo "This command must be run by systemd with User=${APP_USER}" 1>&2
-  exit 6
-fi
-
 # Prevent hidden, confusing overrides of the environment that is configured by this app script.
 if [ -f ${CATALINA_BASE}/bin/setenv.sh ]; then
   echo "Remove (or move) ${CATALINA_BASE}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
   echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
-  exit 7
+  exit 78 # EX_CONFIG Configuration error
 fi
 if [ -f ${CATALINA_HOME}/bin/setenv.sh ]; then
   echo "Remove (or move) ${CATALINA_HOME}/bin/setenv.sh to prevent it from overriding $PARAM_FILE and $0" 1>&2
   echo "and, if necessary, configure the environment in $PARAM_FILE or $0 instead." 1>&2
-  exit 8
+  exit 78 # EX_CONFIG Configuration error
 fi
 
 #---------- other environment variables -------------
@@ -197,7 +184,7 @@ CO="$CO $VERBOSE_GC"
 # additional options for JMX (for management via VisualVM or Zabbix)
 if [ ! -z "$JMX_PORT" ]; then
   CO="$CO -Dcom.sun.management.jmxremote.port=$JMX_PORT"
-  JMX_RMI_PORT=${JMX_RMI_PORT:-`expr $JMX_PORT + 100`}  # default to ITS convention, if not given
+  JMX_RMI_PORT=${JMX_RMI_PORT:-$(expr $JMX_PORT + 100)}  # default to ITS convention, if not given
   WAIT_PORTS="${WAIT_PORTS} $JMX_RMI_PORT"  # add defaulted port (even though it's redundant if not defaulted)
   CO="$CO -Dcom.sun.management.jmxremote.rmi.port=$JMX_RMI_PORT"
   CO="$CO -Dcom.sun.management.jmxremote.ssl=false"
@@ -233,7 +220,7 @@ ps_tomcat() {
 netstat_port() {
   if [ -x /bin/ss ]; then    # for Jenkins on docci debian:stretch (no netstat)
     /bin/ss -a | awk -v hnp=":$1$" '$5 ~ hnp'
-  elif [ `uname` = "Darwin" ]; then     # macOS
+  elif [ $(uname) = "Darwin" ]; then     # macOS (but not systemd, so this script won't work, anyway)
     netstat -v -a -n | awk -v hnp="[.]$1$" '$4 ~ hnp'
   else  # RHEL, etc
     netstat -v -a -n -t | gawk -v hnp=":$1$" '$4 ~ hnp'
@@ -248,14 +235,14 @@ wait_for_ports_to_close() {
     echo "Waiting up to $WAIT_PORTS_SECONDS seconds for sockets on ports $* to close..."
     WAITED=0
     for PORT do
-      PORT_STATUS=`netstat_port $PORT`
+      PORT_STATUS=$(netstat_port $PORT)
       if [ ! -z "$PORT_STATUS" -a $WAITED -le $WAIT_PORTS_SECONDS ]; then
         echo "Waiting for sockets on port $PORT to close..."
         while [ ! -z "$PORT_STATUS" ]; do
           echo $PORT_STATUS
           sleep 3
-          WAITED=`expr $WAITED + 3`
-          PORT_STATUS=`netstat_port $PORT`
+          WAITED=$(expr $WAITED + 3)
+          PORT_STATUS=$(netstat_port $PORT)
         done
       fi
       echo "port $PORT is free"
@@ -266,14 +253,14 @@ wait_for_ports_to_close() {
 rotate() {
     pushd $LOG_DIR > /dev/null
     APP_LOG_FILE=$(basename "$APP_LOG")
-    LOG_FILES=$(ls [ae]*txt *log *log.? catalina.out catalina.out-* 2> /dev/null | grep -v "^$APP_LOG_FILE$")
+    LOG_FILES=$(ls *txt *log *log.? catalina.out catalina.out-* 2> /dev/null | grep -v "^$APP_LOG_FILE$")
     if [ -z "$LOG_FILES" ]; then
         # no files to rotate, so don't create $BKUP_DIR (normal for starting)
         popd > /dev/null
         return 0
     fi
 
-    BKUP_DIR=`date '+%y%m%d-%H%M'`
+    BKUP_DIR=$(date '+%y%m%d-%H%M')
     echo "Creating backup directory, $LOG_DIR/$BKUP_DIR..."
     if ! mkdir $BKUP_DIR; then
         echo "Can't create $LOG_DIR/$BKUP_DIR."
@@ -285,7 +272,7 @@ rotate() {
     echo "Moving log files to $LOG_DIR/$BKUP_DIR..."
     /bin/mv $LOG_FILES $BKUP_DIR
 
-    CNT=`ls $BKUP_DIR | wc -l`
+    CNT=$(ls $BKUP_DIR | wc -l)
     echo "$CNT files moved to $LOG_DIR/$BKUP_DIR"
 
     echo "Compressing files in $LOG_DIR/$BKUP_DIR"
@@ -317,7 +304,7 @@ start() {
       echo -e "\n\n" && return 9
     fi
 
-    echo "Starting Tomcat at `date`"
+    echo "Starting Tomcat at $(date)"
     ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml
     STARTUP_EXIT_CODE=$?
     if [ $STARTUP_EXIT_CODE -ne 0 ]; then
@@ -332,7 +319,7 @@ start() {
         echo -e "\n\n" && return 1
     fi
 
-    PID=`cat_pid`
+    PID=$(cat_pid)
 
     if ps_tomcat $PID; then
         echo "Tomcat started; now checking for good context startup..."
@@ -362,7 +349,7 @@ check_context_startup() {
     GOOD="INFO.* Server startup in "
     while ! grep -q "${BAD}\|${GOOD}" $CATALINA && [ $START_SECONDS -eq 0 -o $WAITED -lt $START_SECONDS ]; do
         sleep 1
-        WAITED=`expr $WAITED + 1`
+        WAITED=$(expr $WAITED + 1)
     done
     kill $TAIL_PID
     wait $TAIL_PID 2>/dev/null  # probably also avoids Terminated message, and syncs on kill for clean log
@@ -379,7 +366,7 @@ check_context_startup() {
 }
 
 stop() {
-    echo "Stopping Tomcat servlet container at `date`"
+    echo "Stopping Tomcat servlet container at $(date)"
     # Providing CATALINA_PID and $STOP_SECONDS, but not -force, so Tomcat 8 catalina.sh does a kill -3 thread dump on timeout.
     ${CATALINA_HOME}/bin/shutdown.sh $STOP_SECONDS
     SHUTDOWN_EXIT_CODE=$?
@@ -387,10 +374,10 @@ stop() {
       echo "Tomcat shutdown.sh exited with code $SHUTDOWN_EXIT_CODE, but app script will try, too."
     fi
 
-    PID=`cat_pid`
+    PID=$(cat_pid)
 
     if [ -z "$PID" ]; then
-        PID=`ps_tomcat ^$APP_USER | awk '{print $2}'`
+        PID=$(ps_tomcat ^$APP_USER | awk '{print $2}')
     fi
 
     if [ ! -z "$PID" ]; then
@@ -428,7 +415,7 @@ case "$1" in
     ;;
 *)
     echo "Usage: $0 { start | stop }" 1>&2
-    exit 12
+    exit 64 # EX_USAGE Command line usage error
     ;;
 esac
 # eof: sapp

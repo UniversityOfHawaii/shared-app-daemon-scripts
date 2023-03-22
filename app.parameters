@@ -1,16 +1,13 @@
-# app.parameters - include from app, sapp, prep, and deploy scripts.
+# $HOME/app.parameters - include from app and sapp scripts.
 # Try to avoid modifying those scripts, to make them easier to maintain.
 #
 # $Id$
 #
  
-# required, daemon's user name, e.g., APP_USER=casl2d
-APP_USER={{ user }}
-
-# required by prep and deploy scripts, daemon's group name, e.g., APP_GRP=cas
+# required by prep action, daemon's group name, e.g., APP_GRP=cas
 APP_GRP={{ group }}
 
-# required by prep and deploy scripts, web app's context name, e.g., CTX_NAME=casl2
+# required by prep and deploy actions, web app's context name, e.g., CTX_NAME=casl2
 CTX_NAME={{ context_name }}
 
 # optional, but recommended for monitoring and maintenance
@@ -46,14 +43,14 @@ CTX_NAME={{ context_name }}
 
 # override of JAVA_HOME, with a different name to avoid unintentional overrides
 #OVERRIDE_JAVA_HOME=/usr/java/latest
+#OVERRIDE_JAVA_HOME=$(readlink -f /etc/alternatives/jre_17_openjdk)
 
 # override where Tomcat is
-#APP_HOME=/home/${APP_USER}
-#CATALINA_BASE=${APP_HOME:?}/tomcat
+#CATALINA_BASE=${HOME:?}/tomcat
 #CATALINA_HOME=/usr/local/pkg/tomcat
 
 # set if compatible, for wait stats in Zabbix, altho the file itself is optional
-#SOCKET_MBEAN_AGENT=${APP_HOME:?}/common-1.17-socketStatisticsAgent.jar
+#SOCKET_MBEAN_AGENT=${HOME:?}/common-1.17-socketStatisticsAgent.jar
 
 # override the number of days to age off log directories; default is 30 days
 #OLD_AGE=120
