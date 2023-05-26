@@ -35,6 +35,7 @@
 #      2022-10-27 jbeutel@hawaii.edu; stricter ps_tomcat matches
 #      2022-11-01 jbeutel@hawaii.edu; age_logs() also works when $LOG_DIR is a symbolic link
 #      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
+#      2023-05-02 jbeutel@hawaii.edu; use --user instance of systemd on RHEL8
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -54,20 +55,28 @@
 
 set -u  # treat expansion of unset variables (without a default) as an error
 
+ps_comm() {
+    ps -p $1 -co comm | tail -1
+}
+
 # Allow use only by systemd, so it always knows if this app is running.
-if [[ $(ps -p 1 -o comm | tail -1) != "systemd" ]]; then
-  stdbuf -eL echo "This app script is intended for running on a systemd platform such as RHEL7." 1>&2
+if [[ $(ps_comm 1) != "systemd" ]]; then
+  stdbuf -eL echo "This app script is intended for running on a systemd platform such as RHEL7 or RHEL8." 1>&2
   exit 64 # EX_USAGE Command line usage error
 fi
-if [ $PPID -ne 1 ]; then
+if [[ $(ps_comm $PPID) != "systemd" ]]; then
   stdbuf -eL echo "Do not run this sapp script directly, so RHEL7/8 systemd can manage what is running;" 1>&2
-  stdbuf -eL echo "instead, as the daemon user, use 'app {start|stop|check}'" 1>&2
+  stdbuf -eL echo "instead, as the daemon user, use 'app {start|stop|check|...}'" 1>&2
   exit 77 # EX_NOPERM Permission denied
 fi
 
-# Require CATALINA_PID be defined in tomcat_$APP_USER.service, not in $PARAM_FILE (which is loaded next).
+# Require CATALINA_PID be defined in the systemd service file, not in $PARAM_FILE (which is loaded next).
 APP_USER=$(whoami)
-SERVICE_FILE="/etc/systemd/system/tomcat_${APP_USER}.service"
+if [[ $PPID -eq 1 ]]; then  # systemd --system
+  SERVICE_FILE="/etc/systemd/system/tomcat_${APP_USER}.service"
+else    # systemd --user
+  SERVICE_FILE="$HOME/.config/systemd/user/tomcat.service"
+fi
 if [ -z "${CATALINA_PID:-}" ]; then
   stdbuf -eL echo "CATALINA_PID Environment and PIDFile should be set in ${SERVICE_FILE}" 1>&2
   exit 78 # EX_CONFIG Configuration error
@@ -117,18 +126,35 @@ APP_LOG=${LOG_DIR}/app-err.log
 exec &> >(tee -a "$APP_LOG")
 
 # Validate CATALINA_PID and PIDFile in ${SERVICE_FILE}, to avoid starting with bad ones (which gets messy).
-EXPECTED_PIDFILE="/run/${APP_USER}/pidfile"
-if [ "${CATALINA_PID}" != "${EXPECTED_PIDFILE}" ]; then
-  stdbuf -eL echo "CATALINA_PID is ${CATALINA_PID} but should be ${EXPECTED_PIDFILE}" 1>&2
-  exit 78 # EX_CONFIG Configuration error
-fi
-if ! grep -q "^Environment=\"CATALINA_PID=${EXPECTED_PIDFILE}\"$" $SERVICE_FILE; then
-  stdbuf -eL echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
-  exit 78 # EX_CONFIG Configuration error
-fi
-if ! grep -q "^PIDFile=${EXPECTED_PIDFILE}$" $SERVICE_FILE; then
-  stdbuf -eL echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
-  exit 78 # EX_CONFIG Configuration error
+EXPECTED_PIDFILE="${APP_HOME}/tomcat/pidfile"
+if [[ $PPID -eq 1 ]]; then  # systemd --system on RHEL7
+  # EXPECTED_PIDFILE="/run/${APP_USER}/pidfile"   # if we were using systemd --system on RHEL8, but we aren't
+  if [ "${CATALINA_PID}" != "${EXPECTED_PIDFILE}" ]; then
+    stdbuf -eL echo "CATALINA_PID is ${CATALINA_PID} but should be ${EXPECTED_PIDFILE}" 1>&2
+    exit 78 # EX_CONFIG Configuration error
+  fi
+  if ! grep -q "^Environment=\"CATALINA_PID=${EXPECTED_PIDFILE}\"$" $SERVICE_FILE; then
+    stdbuf -eL echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
+    exit 78 # EX_CONFIG Configuration error
+  fi
+  if ! grep -q "^PIDFile=${EXPECTED_PIDFILE}$" $SERVICE_FILE; then
+    stdbuf -eL echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
+    exit 78 # EX_CONFIG Configuration error
+  fi
+else    # systemd --user on RHEL8
+  EXPECTED_PIDFILE="${APP_HOME}/tomcat/pidfile"
+  if [ "${CATALINA_PID}" != "${EXPECTED_PIDFILE}" ]; then
+    stdbuf -eL echo "CATALINA_PID is ${CATALINA_PID} but should be ${EXPECTED_PIDFILE}" 1>&2
+    exit 78 # EX_CONFIG Configuration error
+  fi
+  if ! grep -q "^Environment=\"CATALINA_PID=%h/tomcat/pidfile\"$" $SERVICE_FILE; then
+    stdbuf -eL echo "CATALINA_PID Environment should be set in ${SERVICE_FILE}" 1>&2
+    exit 78 # EX_CONFIG Configuration error
+  fi
+  if ! grep -q "^PIDFile=%h/tomcat/pidfile$" $SERVICE_FILE; then
+    stdbuf -eL echo "PIDFile in ${SERVICE_FILE} should be set to ${CATALINA_PID}" 1>&2
+    exit 78 # EX_CONFIG Configuration error
+  fi
 fi
 
 #  Remove log files older than these many days; override in PARAM_FILE

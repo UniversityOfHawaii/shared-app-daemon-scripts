@@ -1,0 +1,28 @@
+# shared-app-daemon-scripts for RHEL7 /etc/systemd/system/tomcat_{{ user }}.service
+
+[Unit]
+Description=Apache Tomcat Application Server for {{ user }}
+After=syslog.target network.target
+
+[Service]
+Type=forking
+
+User={{ user }}
+Group=tomcat
+
+Environment="CATALINA_PID=/home/{{ user }}/tomcat/pidfile"
+PIDFile=/home/{{ user }}/tomcat/pidfile
+
+WorkingDirectory=/home/{{ user }}
+ExecStart=/home/{{ user }}/sapp start
+TimeoutStartSec=960s
+ExecStop=/home/{{ user }}/sapp stop
+TimeoutStopSec=300s
+
+# When Java receives a SIGTERM (kill -15), it exits with 128 + 15 (i.e., 143), so consider that to be
+# a successful stop (even though Tomcat's shutdown message may have failed or timed out beforehand,
+# for shutdown.sh to resort to kill -15; it was not a kill -9, at least).
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

@@ -4,6 +4,7 @@
 #      2022-08-02 jbeutel@hawaii.edu; renamed to app-common and made backwards compatible
 #      2022-09-20 jbeutel@hawaii.edu; hide tail stderr
 #      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
+#      2023-05-02 jbeutel@hawaii.edu; use --user instance of systemd on RHEL8
 #
 # $Id$
 #---------------------------------------------------------------------
@@ -12,14 +13,14 @@
 #   2. For { start | stop | check | status }, returns
 #        0 if successfully starts or checks that Tomcat is running
 #        non-0 if Tomcat not running (NB: successful stop returns non-0, like for SysV init)
-#   3. For { prep | stop0 | stopped | show | deploy | provision }, returns
+#   3. For { prep | stop0 | stopped | restart | show | deploy | provision }, returns
 #        0 if successful/true (NB: stop0 return 0 if Tomcat is not running, unlike for SysV init)
 #        non-0 if failed/false
 #---------------------------------------------------------------------
 # Install:
 #   1. Install as app-common in /usr/local/bin/appDaemon.
 #   2. Optional symlink from /usr/local/bin/appDaemon/app-common to app in daemon user's home dir.
-#   3. sudoers allows daemon user to "/bin/systemctl {start|stop|show|--no-pager --lines=[0-9][0-9] status} tomcat_${daemon user}"
+#   3. (RHEL7) sudoers allows daemon user to "/bin/systemctl {start|stop|show|--no-pager --lines=[0-9][0-9] status} tomcat_${daemon user}"
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -64,8 +65,19 @@ follow() {
   tail -n 0 -F --pid=$$ $APP_LOG 2>/dev/null &
 }
 
+# returns whether systemd supports the --user instance (i.e., RHEL8)
+systemd_supports_user_instance() {
+  RHEL8_SYSTEMCTL_VERSION=239
+  SYSTEMCTL_VERSION=$(/bin/systemctl --version | head -1 | cut -d ' ' -f 2)
+  [[ $SYSTEMCTL_VERSION -ge $RHEL8_SYSTEMCTL_VERSION ]]
+}
+
 sapp() {
-  sudo /bin/systemctl $* tomcat_${APP_USER}
+  if systemd_supports_user_instance; then  # RHEL8
+    XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user $* tomcat
+  else  # systemd --system on RHEL7
+    sudo /bin/systemctl $* tomcat_${APP_USER}
+  fi
 }
 
 # returns 0 (success) if the app is not running, 150 if it is running, or other non-0 for error.
@@ -155,7 +167,19 @@ restart() {
 }
 
 status() {
-  sapp --no-pager --lines=${STATUS_LINES} status
+  # RHEL8 somehow needs --no-pager, regardless of --lines, and that would be fine on RHEL7 too.
+  # However, we might not get around to reconfiguring the sudoers on all of our RHEL7 hosts
+  # to allow for that, so just do what we can for now.
+  if systemd_supports_user_instance || sudo_allows_systemctl_status_options; then
+    sapp --no-pager --lines=${STATUS_LINES} status
+  else
+    sapp status
+  fi
+}
+
+# returns whether sudo allows this user to run systemctl status with certain options
+sudo_allows_systemctl_status_options() {
+  sudo -l | grep -q 'systemctl --no-pager --lines\\=\[0-9]\[0-9] status'
 }
 
 usage() {
