@@ -36,6 +36,7 @@
 #      2022-11-01 jbeutel@hawaii.edu; age_logs() also works when $LOG_DIR is a symbolic link
 #      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
 #      2023-05-02 jbeutel@hawaii.edu; use --user instance of systemd on RHEL8
+#      2023-05-25 jbeutel@hawaii.edu; add EXCLUDE_CATALINA_QUOTE_FROM_APP_ERR_LOG
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -367,8 +368,13 @@ start() {
 
 check_context_startup() {
     CATALINA=$LOG_DIR/catalina.out
-    echo -e "\nStarted following $CATALINA..."
-    tail -F $CATALINA --pid=$$ 2>/dev/null &  # to stdout and $APP_LOG, while we're waiting on it
+    if [[ ${EXCLUDE_CATALINA_QUOTE_FROM_APP_ERR_LOG:-"no"} = "exclude" ]] ; then
+      echo -e "\nStarted monitoring $CATALINA but excluding it from output..."
+      tail -F $CATALINA --pid=$$ 2>/dev/null 1>&2 &
+    else
+      echo -e "\nStarted following $CATALINA..."
+      tail -F $CATALINA --pid=$$ 2>/dev/null &  # to stdout and $APP_LOG, while we're waiting on it
+    fi
     TAIL_PID=$!
     disown %%  # to definitely avoid Terminated message when tail is killed
     WAITED=0

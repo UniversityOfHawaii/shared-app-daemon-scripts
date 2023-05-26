@@ -60,3 +60,6 @@ CTX_NAME={{ context_name }}
 
 # number of journal lines to output on status/check, sudo allows 00..99 (w/ leading 0)
 #STATUS_LINES=15
+
+# prevents adding the context startup part of catalina.out to app-err.log, systemctl status, and app script output
+#EXCLUDE_CATALINA_QUOTE_FROM_APP_ERR_LOG="exclude"
