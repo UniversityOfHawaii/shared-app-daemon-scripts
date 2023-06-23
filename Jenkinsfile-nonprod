@@ -5,22 +5,21 @@ pipeline {
   }
   environment {
     SCP_OPTS = ""   // "-v" // for debugging
+    RHEL8_FILES = '*-common app.parameters jmxremote.* tomcat.service README.md'
   }
   stages {
-      stage('SCP *-common') {
+      stage('SCP files') {
           steps {
+              // RHEL7
               sh 'scp ${SCP_OPTS} *-common cisd@its60.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its70.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its71.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its72.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@its73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp ${SCP_OPTS} *-common cisd@sec90.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-//              sh 'scp ${SCP_OPTS} *-common myiamd@iwa73.its.hawaii.edu:/usr/local/bin/appDaemon/'
-//              sh 'scp ${SCP_OPTS} *-common myiamd@iws73.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-//              sh 'scp ${SCP_OPTS} *-common myiamd@iwa43.its.hawaii.edu:/usr/local/bin/appDaemon/'
-//              sh 'scp ${SCP_OPTS} *-common myiamd@iws43.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-//              sh 'scp ${SCP_OPTS} *-common myiamd@iwa71.its.hawaii.edu:/usr/local/bin/appDaemon/'
-//              sh 'scp ${SCP_OPTS} *-common myiamd@iws71.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+              // RHEL8
+              sh 'scp ${SCP_OPTS} ${RHEL8_FILES} myiamd@iwa74.its.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp ${SCP_OPTS} ${RHEL8_FILES} myiamd@iws74.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
           }
       }
   }
