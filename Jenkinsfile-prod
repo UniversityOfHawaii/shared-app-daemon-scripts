@@ -6,7 +6,7 @@ pipeline {
     buildDiscarder(logRotator(numToKeepStr:'90'))
   }
   environment {
-    RHEL8_FILES = '*-common app.parameters jmxremote.* tomcat.service README.md'
+    RHEL8_FILES = '*-common app.parameters jmxremote.* tomcat.service README.md 50-shared-app-daemon-scripts.conf'
   }
   stages {
       stage('SCP files') {

@@ -29,16 +29,31 @@ The following must be set up prior to installation:
      directory="logs"  prefix="access_log." suffix=".txt"
      pattern="%h %l %u %t &quot;%r&quot; %s %b &quot;%{Referer}i&quot; &quot;%{User-Agent}i&quot; %D &quot;%{X-Forwarded-For}i&quot;"/>
      ```
-   * RHEL8 only:  the root user (or sudo)
+1. This distribution should be deployed in `/usr/local/bin/appDaemon`, for example, on RHEL8:
+    ```
+    $ ls -l /usr/local/bin/appDaemon
+    total 60
+    -rw-r--r--. 1 myiamd myiam   861 Jun 22 18:04 50-shared-app-daemon-scripts.conf
+    -rwxr-xr-x. 1 myiamd myiam  7866 Jun 22 18:04 app-common
+    -rw-r--r--. 1 myiamd myiam  2615 Jun 22 18:04 app.parameters
+    -rwxr-xr-x. 1 myiamd myiam   120 Jun 22 18:04 deploy-common
+    -rw-r--r--. 1 myiamd myiam   959 Jun 22 18:04 jmxremote.access
+    -rw-r--r--. 1 myiamd myiam   462 Jun 22 18:04 jmxremote.password
+    -rwxr-xr-x. 1 myiamd myiam   118 Jun 22 18:04 prep-common
+    -rw-r--r--. 1 myiamd myiam  4977 Jun 22 18:04 README.md
+    -rwxr-xr-x. 1 myiamd myiam 18174 Jun 22 18:04 sapp-common
+    -rw-r--r--. 1 myiamd myiam   774 Jun 22 18:04 tomcat.service
+    ```
+1. The root user (or sudo) must:
+    * on RHEL8:
        * `loginctl enable-linger {{ user }}`
-       * edits `/etc/systemd/journald.conf` to add `Storage=persistent` 
-         to the `[Journal]` section, and then `systemctl restart systemd-journald`
-   * RHEL7 only:  the root user (or sudo)
-       * sets up the daemon user with sudo access
+       * install `50-shared-app-daemon-scripts.conf` as instructed in that file.
+   * on RHEL7:
+       * set up the daemon user with sudo access
          to run `/bin/systemctl {start|stop|show|status} tomcat_{{ user }}`,
          preferably with options `--no-pager --lines=[0-9][0-9] ` before `status`.
-       * copies `tomcat_Xd.service` to `/etc/systemd/system/tomcat_{{ user }}.service`
-         and edits it to change `{{ user }}` to the daemon username, e.g., `casl2d`.
+       * copy `tomcat_Xd.service` to `/etc/systemd/system/tomcat_{{ user }}.service`
+         and edit it to change `{{ user }}` to the daemon username, e.g., `casl2d`.
        * `systemctl daemon-reload`
        * `systemctl enable tomcat_{{ user }}`
 1. The app server instance must be created.
@@ -47,21 +62,7 @@ The following must be set up prior to installation:
      to host and connector port.
 1. Users that administer the web app must be in the daemon user's group.
 1. Users in the daemon user's group must be set up with sudo access to switch user to the daemon user.
-1. This distribution must be unpacked in `/usr/local/bin/appDaemon`
 
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-```
-$ ls -l /usr/local/bin/appDaemon
-total 198
--rwxrwxr-x   1 root     root        8445 Aug  5 11:23 app-common
--rw-r--r--   1 root     root        2047 Aug  5 10:50 app.parameters
--rwxrwxr-x   1 root     root        2812 Aug  5 11:23 deploy-common
--rw-r--r--   1 root     root         945 Mar  3 11:17 jmxremote.access
--rw-r--r--   1 root     root         430 Mar  3 11:17 jmxremote.password
--rwxrwxr-x   1 root     root        3182 Aug  5 11:23 prep-common
--rwxrwxr-x   1 root     root        1367 Aug  5 11:23 sapp-common
-```
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 INSTALLATION
 
 1. Switch to the daemon user.  (e.g., `osu casl2d` or `sudo su - casl2d`)
@@ -79,14 +80,15 @@ INSTALLATION
       jmxremote.access
       jmxremote.password
     ```     
-1. Edit the jmxremote.password file and set the password.
-1. Edit the app.parameters file and set these:
+1. Edit the `jmxremote.password` file and set the password.
+1. Edit the `app.parameters` file and set these:
     ```
      APP_GRP
      CTX_NAME
      JMX_PORT
     ```
      and any other settings as needed.
+   (`APP_USER` is obsolete, and should be removed to avoid confusion.)
 1. RHEL8 only (as the daemon user):
    1. `mkdir -p $HOME/.config/systemd/user/` and copy `tomcat.service` to there (no editing required).
    1. Edit `$HOME/.bash_profile` to add `export XDG_RUNTIME_DIR=/run/user/$(id -u)`

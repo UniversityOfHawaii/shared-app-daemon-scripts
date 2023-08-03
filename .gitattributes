@@ -4,3 +4,4 @@ app.parameters ident
 deploy-common ident
 prep-common ident
 cisd-actions ident
+50-shared-app-daemon-scripts.conf ident
