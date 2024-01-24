@@ -37,6 +37,7 @@
 #      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
 #      2023-05-02 jbeutel@hawaii.edu; use --user instance of systemd on RHEL8
 #      2023-05-25 jbeutel@hawaii.edu; add EXCLUDE_CATALINA_QUOTE_FROM_APP_ERR_LOG
+#      2024-01-24 jbeutel@hawaii.edu; start checks for .war file in webapps and its deployment in Tomcat
 #---------------------------------------------------------------------
 # Spec:
 #   1. Run by systemd as the daemon user (Type=forking).
@@ -235,6 +236,14 @@ PATH=${JAVA_HOME}/bin:${PATH}
 CATALINA_OPTS=$CO
 export CATALINA_PID CATALINA_OPTS PATH
 
+# make sure we got the required parameter
+CTX_NAME=${CTX_NAME:?}
+
+# Binary distribution must be named like so:
+DIST=${DIST:-${CTX_NAME}.war}
+
+WEBAPPS_DIR=${WEBAPPS_DIR:-${CATALINA_BASE}/webapps}
+
 #-------------------- helpers -----------------------
 
 cat_pid() {
@@ -332,6 +341,11 @@ start() {
       echo -e "\n\n" && return 9
     fi
 
+    if [ ! -f ${WEBAPPS_DIR}/${DIST} ] ; then
+      echo "${DIST} not found.  Please upload it and run 'app prep' before 'app deploy'."
+      echo -e "\n\n" && return 78 # EX_CONFIG Configuration error
+    fi
+
     echo "Starting Tomcat at $(date)"
     ${CATALINA_HOME}/bin/startup.sh -config $CATALINA_BASE/conf/server.xml
     STARTUP_EXIT_CODE=$?
@@ -379,6 +393,7 @@ check_context_startup() {
     disown %%  # to definitely avoid Terminated message when tail is killed
     WAITED=0
     BAD="SEVERE"  # e.g., "^SEVERE: Context .* startup failed", or "^SEVERE: Failed to initialize end point"
+    # The following ".*" can be ":" for Tomcat 7 or 8.5, but not for Tomcat 10, etc.
     GOOD="INFO.* Server startup in "
     while ! grep -q "${BAD}\|${GOOD}" $CATALINA && [ $START_SECONDS -eq 0 -o $WAITED -lt $START_SECONDS ]; do
         sleep 1
@@ -387,14 +402,22 @@ check_context_startup() {
     kill $TAIL_PID
     wait $TAIL_PID 2>/dev/null  # probably also avoids Terminated message, and syncs on kill for clean log
     echo "Stopped following $CATALINA"
+    # Also check that not only Tomcat, but also the .war file, finished starting up, too.
+    # Tomcat 7 & 8.5, at least, still say that they deploy the .war file, even when
+    # it starts again, after the expanded .war directory is already there.
+    # (The following ".*" can be ":" for Tomcat 7 or 8.5, but not for Tomcat 10, etc.)
+    GOOD2="INFO.* Deployment of web application archive \[${WEBAPPS_DIR}/${DIST}\] has finished in "
     if grep "$BAD" $CATALINA ; then
         return 10
-    elif grep -q "$GOOD" $CATALINA ; then
+    elif grep -q "$GOOD" $CATALINA && grep -q "$GOOD2" $CATALINA ; then
         echo "Context startup looks good."
         return 0
+    elif ! grep -q "$GOOD2" $CATALINA ; then
+        echo "Error: $CATALINA shows server startup without .war deploy: missing '$GOOD2'"
+        return 11
     else
         echo "Error: $CATALINA did not look good within $START_SECONDS seconds"
-        return 11
+        return 12
     fi
 }
 
