@@ -5,6 +5,7 @@
 #      2022-09-20 jbeutel@hawaii.edu; hide tail stderr
 #      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
 #      2023-05-02 jbeutel@hawaii.edu; use --user instance of systemd on RHEL8
+#      2024-01-23 jbeutel@hawaii.edu; avoid failing prep for no .war in webapps dir
 #
 # $Id$
 #---------------------------------------------------------------------
@@ -101,10 +102,14 @@ stop0() {
   sapp stop || stopped
 }
 
-# prep - Move a binary distribution file to the application daemon
+# prep - Copy a .war file to the application daemon
 #        user's webapps directory and set the group ownership
 #        and file permissions of the file so that the application daemon
 #        user can manipulate the file.
+#
+#        In our original usage of the prep script, it was run by the developer or SA, not the daemon user,
+#        to simplify the copying of the .war file, while preserving its ownership.  Now, however, the
+#        daemon user needs to run this (because it depends on $HOME), so it could be combined with deploy.
 prep() {
   if [ ! -f ${DIST} ] ; then
     echo "${DIST} not found"
@@ -116,13 +121,15 @@ prep() {
     return 72 # EX_OSFILE Critical OS file missing
   fi
 
-  # Move file to application daemon user's servlet directory.
-  # (This preserves the original owner of the file, but now it's normally the daemon user, anyway.)
+  # Copy file to application daemon user's servlet directory.
   echo "Moving ${DIST} to ${WEBAPPS_DIR} ..."
   DT=`date '+%y%m%d-%H%M'`
   # Only keep one previous war file.
   /bin/rm -f ${WEBAPPS_DIR}/${DIST}-* || return $?
-  /bin/mv ${WEBAPPS_DIR}/${DIST} ${WEBAPPS_DIR}/${DIST}-${DT} || return $?
+  # Keep the previous war file (if there is one).
+  if dist_in_webapps_dir ; then
+     /bin/mv -v ${WEBAPPS_DIR}/${DIST} ${WEBAPPS_DIR}/${DIST}-${DT} || return $?
+  fi
   /bin/cp ./${DIST} ${WEBAPPS_DIR} || return $?
 
   echo "Setting file access on ${DIST}..."
@@ -135,13 +142,17 @@ prep() {
   echo "Now you can 'app stop', 'app deploy', ensure config files are correct, & 'app start'."
 }
 
+dist_in_webapps_dir() {
+  [ -f ${WEBAPPS_DIR}/${DIST} ]
+}
+
 # deploy - Removes the old directory that the app's WAR file was expanded in
 #          to make sure that the new WAR file is deployed.
 deploy() {
   WEBCONF_DIR=${WEBCONF_DIR:-${CATALINA_BASE}/conf/Catalina}
   WORK_DIR=${WORK_DIR:-${CATALINA_BASE}/work}
 
-  if [ ! -f ${WEBAPPS_DIR}/${DIST} ] ; then
+  if ! dist_in_webapps_dir ; then
     echo "${DIST} not found.  Please upload it and run 'app prep' before 'app deploy'."
     return 78 # EX_CONFIG Configuration error
   fi
