@@ -14,6 +14,7 @@
 # 2014-04-04 jbeutel
 # 2022-07-27 jbeutel update for RHEL7
 # 2022-08-02 jbeutel switch to backwards compatible app script
+# 2024-03-05 jbeutel add dbdump action, don't dbdump on deploy, and use webapp's dbdump.sh instead of ssh
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -32,6 +33,12 @@ CTX_NAME=${CTX_NAME:?}
 
 SAFE_DIR="wars-from-cisd"
 LOG="cisd-actions.log"
+
+# avoid this being overridden by old app.parameters
+APP_HOME=${HOME:?}
+
+CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
+WEBAPPS_DIR=${WEBAPPS_DIR:-${CATALINA_BASE}/webapps}
 
 # parameter: path to a file within $SAFE_DIR
 validatePath() {
@@ -89,11 +96,11 @@ check() {
 }
 
 dbdump() {
-    ssh cisd@web12.pvt.hawaii.edu "sudo /usr/local/sbin/dbdump dump $1"
+    $WEBAPPS_DIR/$CTX_NAME/WEB-INF/deployed-scripts/dbdump/dbdump.sh
 }
 
 deploy() {
-    $BASE/prep && stop && dbdump "$1" && $BASE/deploy && start
+    $BASE/prep && stop && $BASE/deploy && start
 }
 
 echo "$(date) $*" >> $LOG
@@ -105,17 +112,8 @@ case "$1" in
 'soft-link')
     soft-link "$2"
     ;;
-'start')
-    start
-    ;;
-'stop')
-    stop
-    ;;
-'check')
-    check
-    ;;
-'deploy')
-    deploy "$2"
+'start'|'stop'|'check'|'deploy'|'dbdump')
+    $1
     ;;
 'echo')
     echo "$0 echoing $*"
