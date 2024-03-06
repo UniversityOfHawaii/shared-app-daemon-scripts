@@ -6,6 +6,7 @@
 #      2023-03-15 jbeutel@hawaii.edu; RHEL8 compatibility
 #      2023-05-02 jbeutel@hawaii.edu; use --user instance of systemd on RHEL8
 #      2024-01-23 jbeutel@hawaii.edu; avoid failing prep for no .war in webapps dir
+#      2024-03-05 jbeutel@hawaii.edu; remove APP_GRP, since the daemon user must run this script
 #
 # $Id$
 #---------------------------------------------------------------------
@@ -38,7 +39,6 @@ fi
 . $PARAM_FILE
 
 # make sure we got the required parameters
-APP_GRP=${APP_GRP:?}
 CTX_NAME=${CTX_NAME:?}
 
 # avoid these being overridden by old app.parameters
@@ -102,10 +102,8 @@ stop0() {
   sapp stop || stopped
 }
 
-# prep - Copy a .war file to the application daemon
-#        user's webapps directory and set the group ownership
-#        and file permissions of the file so that the application daemon
-#        user can manipulate the file.
+# prep - Copy a .war file to the application daemon user's webapps directory
+#        and set the file permissions, retaining the previous .war file, but removing any older ones.
 #
 #        In our original usage of the prep script, it was run by the developer or SA, not the daemon user,
 #        to simplify the copying of the .war file, while preserving its ownership.  Now, however, the
@@ -134,9 +132,6 @@ prep() {
 
   echo "Setting file access on ${DIST}..."
   chmod 660 ${WEBAPPS_DIR}/${DIST} || return $?
-
-  echo "Setting group ownership of ${DIST}..."
-  chgrp ${APP_GRP} ${WEBAPPS_DIR}/${DIST} || return $?
   echo
   echo "Done preparing ${DIST}."
   echo "Now you can 'app stop', 'app deploy', ensure config files are correct, & 'app start'."

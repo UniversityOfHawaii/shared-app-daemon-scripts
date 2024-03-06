@@ -4,7 +4,7 @@ This project contains scripts used for Enterprise Systems Software Engineering R
 They are installed commands to start and stop an app server instance,
 and to deploy a new war file for the web app.
 
-RHEL7: uses the systemd system instance (i.e., root's) to run Tomcat at the daemon user,
+RHEL7: uses the systemd system instance (i.e., root's) to run Tomcat as the daemon user,
 instead of via RHEL6's SysV init.  The prep and deploy scripts are now incorporated into
 the app script, so they just call it, for backwards compatibility.
 
@@ -53,19 +53,21 @@ The following must be set up prior to installation:
          to run `/bin/systemctl {start|stop|show|status} tomcat_{{ user }}`,
          preferably with options `--no-pager --lines=[0-9][0-9] ` before `status`.
        * copy `tomcat_Xd.service` to `/etc/systemd/system/tomcat_{{ user }}.service`
-         and edit it to change `{{ user }}` to the daemon username, e.g., `casl2d`.
+         and edit it to change `{{ user }}` to the daemon username, e.g., `tapsd`,
+         and `{{ group }}` to the daemon group, e.g., `taps`.
        * `systemctl daemon-reload`
        * `systemctl enable tomcat_{{ user }}`
 1. The app server instance must be created.
    * App URL in [Where is My Application](https://docs.google.com/spreadsheets/d/1cJUxgyLXftlbgYxM2DSE7X8Lof55miwoff1avm7DtRI/edit?pli=1#gid=0)
    * Apache HTTPS reverse proxy configured with app URL (including domain and `CTX_NAME`)
      to host and connector port.
-1. Users that administer the web app must be in the daemon user's group.
-1. Users in the daemon user's group must be set up with sudo access to switch user to the daemon user.
+1. Users that administer the web app must be
+   set up with sudo access to switch user to the daemon user,
+   and added to the daemon user's group if necessary to access files.
 
 INSTALLATION
 
-1. Switch to the daemon user.  (e.g., `osu casl2d` or `sudo su - casl2d`)
+1. Switch to the daemon user.  (e.g., `osu tapsd` or `sudo su - tapsd`)
 1. In the daemon user's home directory, create symbolic links to the shared app scripts.
     ```
     $ ln -s /usr/local/bin/appDaemon/app-common app
@@ -83,12 +85,11 @@ INSTALLATION
 1. Edit the `jmxremote.password` file and set the password.
 1. Edit the `app.parameters` file and set these:
     ```
-     APP_GRP
      CTX_NAME
      JMX_PORT
     ```
      and any other settings as needed.
-   (`APP_USER` is obsolete, and should be removed to avoid confusion.)
+   (`APP_USER` and `APP_GRP` are obsolete, and should be removed to avoid confusion.)
 1. RHEL8 only (as the daemon user):
    1. `mkdir -p $HOME/.config/systemd/user/` and copy `tomcat.service` to there (no editing required).
    1. Edit `$HOME/.bash_profile` to add `export XDG_RUNTIME_DIR=/run/user/$(id -u)`

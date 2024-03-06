@@ -8,7 +8,7 @@ After=syslog.target network.target
 Type=forking
 
 User={{ user }}
-Group=tomcat
+Group={{ group }}
 
 Environment="CATALINA_PID=/home/{{ user }}/tomcat/pidfile"
 PIDFile=/home/{{ user }}/tomcat/pidfile

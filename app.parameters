@@ -4,9 +4,6 @@
 # $Id$
 #
  
-# required by prep action, daemon's group name, e.g., APP_GRP=cas
-APP_GRP={{ group }}
-
 # required by prep and deploy actions, web app's context name, e.g., CTX_NAME=casl2
 CTX_NAME={{ context_name }}
 
