@@ -15,6 +15,7 @@
 # 2022-07-27 jbeutel update for RHEL7
 # 2022-08-02 jbeutel switch to backwards compatible app script
 # 2024-03-05 jbeutel add dbdump action, don't dbdump on deploy, and use webapp's dbdump.sh instead of ssh
+# 2024-03-12 jbeutel update to current app usage, and remove obsolete zabbix_maintenance call on stop.
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -83,24 +84,32 @@ start() {
     $BASE/app start
 }
 
-stop() {
-    ! check && echo "not running, so no need to stop" && return 0
-    /usr/local/sbin/zm 15     # 15-minute Zabbix maintenance
-    echo "Sleeping 20 seconds to let Zabbix recognize maintenance..."
-    sleep 20
-    ! $BASE/app stop    # success if app has stopped
+stop() {    # for backwards compatibility; deprecated
+    stop0
 }
 
-check() {
-    $BASE/app check
+stop0() {
+    $BASE/app stop0    # success if app has stopped
+}
+
+check() {    # for backwards compatibility; deprecated
+    status
+}
+
+status() {
+    $BASE/app status
 }
 
 dbdump() {
     $WEBAPPS_DIR/$CTX_NAME/WEB-INF/deployed-scripts/dbdump/dbdump.sh
 }
 
-deploy() {
-    $BASE/prep && stop && $BASE/deploy && start
+deploy() {      # for backwards compatibility; deprecated use of this term
+    provision
+}
+
+provision() {
+    $BASE/app provision
 }
 
 echo "$(date) $*" >> $LOG
@@ -112,7 +121,7 @@ case "$1" in
 'soft-link')
     soft-link "$2"
     ;;
-'start'|'stop'|'check'|'deploy'|'dbdump')
+'start' | 'stop' | 'stop0' | 'check' | 'status' | 'deploy' | 'provision' | 'dbdump')
     $1
     ;;
 'echo')
