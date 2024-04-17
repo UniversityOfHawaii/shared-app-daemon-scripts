@@ -16,6 +16,7 @@
 # 2022-08-02 jbeutel switch to backwards compatible app script
 # 2024-03-05 jbeutel add dbdump action, don't dbdump on deploy, and use webapp's dbdump.sh instead of ssh
 # 2024-03-12 jbeutel update to current app usage, and remove obsolete zabbix_maintenance call on stop.
+# 2024-04-16 jbeutel add dbrestore action
 
 # You shouldn't need to change variable settings in this script;
 # you can override all variables like FOO=${FOO:-default} in the app.parameters file.
@@ -40,6 +41,7 @@ APP_HOME=${HOME:?}
 
 CATALINA_BASE=${CATALINA_BASE:-${APP_HOME}/tomcat}
 WEBAPPS_DIR=${WEBAPPS_DIR:-${CATALINA_BASE}/webapps}
+DEPLOYED_SCRIPTS=$WEBAPPS_DIR/$CTX_NAME/WEB-INF/deployed-scripts
 
 # parameter: path to a file within $SAFE_DIR
 validatePath() {
@@ -80,6 +82,11 @@ soft-link() {
     ls -ltr $SAFE_DIR
 }
 
+# parameter: path to decrypted, loadable dbdump file
+dbrestore() {
+    stop0 && $DEPLOYED_SCRIPTS/dbrestore/dbrestore.sh "$1" && rm "$1"
+}
+
 start() {
     $BASE/app start
 }
@@ -101,7 +108,7 @@ status() {
 }
 
 dbdump() {
-    $WEBAPPS_DIR/$CTX_NAME/WEB-INF/deployed-scripts/dbdump/dbdump.sh
+    $DEPLOYED_SCRIPTS/dbdump/dbdump.sh
 }
 
 deploy() {      # for backwards compatibility; deprecated use of this term
@@ -120,6 +127,9 @@ case "$1" in
     ;;
 'soft-link')
     soft-link "$2"
+    ;;
+'dbrestore')
+    dbrestore "$2"
     ;;
 'start' | 'stop' | 'stop0' | 'check' | 'status' | 'deploy' | 'provision' | 'dbdump')
     $1
