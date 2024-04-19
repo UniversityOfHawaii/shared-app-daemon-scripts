@@ -21,9 +21,8 @@ pipeline {
               sh 'scp *-common cisd@its32.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp *-common cisd@its33.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
 
-              // sec10 scp failed last time: Permission denied
-              sh 'ssh cisd@sec10.pvt.hawaii.edu ls -l /usr/local/bin/appDaemon/'
-              sh 'ssh cisd@sec10.pvt.hawaii.edu ls -ld /usr/local/bin/appDaemon/'
+              // That directory on sec10 is owned by cisd:cis, but its files are owned by secetsd:secets, so we need to delete them first.
+              sh "ssh cisd@sec10.pvt.hawaii.edu 'rm /usr/local/bin/appDaemon/*-common'"
               sh 'scp *-common cisd@sec10.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
           }
       }
