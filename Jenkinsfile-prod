@@ -11,15 +11,20 @@ pipeline {
   stages {
       stage('SCP files') {
           steps {
+              // RHEL8
+              sh 'scp ${RHEL8_FILES} myiamd@iwa04.its.hawaii.edu:/usr/local/bin/appDaemon/'
+              sh 'scp ${RHEL8_FILES} myiamd@iws04.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+
               // RHEL7
               sh 'scp *-common cisd@its30.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp *-common cisd@its31.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp *-common cisd@its32.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
               sh 'scp *-common cisd@its33.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
+
+              // sec10 scp failed last time: Permission denied
+              sh 'ssh cisd@sec10.pvt.hawaii.edu ls -l /usr/local/bin/appDaemon/'
+              sh 'ssh cisd@sec10.pvt.hawaii.edu ls -ld /usr/local/bin/appDaemon/'
               sh 'scp *-common cisd@sec10.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
-              // RHEL8
-              sh 'scp ${RHEL8_FILES} myiamd@iwa04.its.hawaii.edu:/usr/local/bin/appDaemon/'
-              sh 'scp ${RHEL8_FILES} myiamd@iws04.pvt.hawaii.edu:/usr/local/bin/appDaemon/'
           }
       }
   }
